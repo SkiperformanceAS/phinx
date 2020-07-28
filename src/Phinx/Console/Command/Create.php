@@ -29,7 +29,7 @@ class Create extends AbstractCommand
     /**
      * The name of the interface that any external template creation class is required to implement.
      */
-    const CREATION_INTERFACE = 'Phinx\Migration\CreationInterface';
+    public const CREATION_INTERFACE = 'Phinx\Migration\CreationInterface';
 
     /**
      * {@inheritDoc}
@@ -41,7 +41,7 @@ class Create extends AbstractCommand
         parent::configure();
 
         $this->setDescription('Create a new migration')
-            ->addArgument('name', InputArgument::REQUIRED, 'What is the name of the migration (in CamelCase)?')
+            ->addArgument('name', InputArgument::OPTIONAL, 'Class name of the migration (in CamelCase)')
             ->setHelp(sprintf(
                 '%sCreates a new database migration%s',
                 PHP_EOL,
@@ -73,7 +73,7 @@ class Create extends AbstractCommand
     /**
      * Get the question that allows the user to select which migration path to use.
      *
-     * @param string[] $paths
+     * @param string[] $paths Paths
      *
      * @return \Symfony\Component\Console\Question\ChoiceQuestion
      */
@@ -85,12 +85,12 @@ class Create extends AbstractCommand
     /**
      * Returns the migration path to create the migration in.
      *
-     * @param \Symfony\Component\Console\Input\InputInterface $input
-     * @param \Symfony\Component\Console\Output\OutputInterface $output
+     * @param \Symfony\Component\Console\Input\InputInterface $input Input
+     * @param \Symfony\Component\Console\Output\OutputInterface $output Output
      *
      * @throws \Exception
      *
-     * @return mixed
+     * @return string
      */
     protected function getMigrationPath(InputInterface $input, OutputInterface $output)
     {
@@ -123,7 +123,7 @@ class Create extends AbstractCommand
             return array_shift($paths);
         }
 
-        // Ask the user which of their defined paths they'd like to use:
+        /** @var \Symfony\Component\Console\Helper\QuestionHelper $helper */
         $helper = $this->getHelper('question');
         $question = $this->getSelectMigrationPathQuestion($paths);
 
@@ -133,8 +133,8 @@ class Create extends AbstractCommand
     /**
      * Create the new migration.
      *
-     * @param \Symfony\Component\Console\Input\InputInterface $input
-     * @param \Symfony\Component\Console\Output\OutputInterface $output
+     * @param \Symfony\Component\Console\Input\InputInterface $input Input
+     * @param \Symfony\Component\Console\Output\OutputInterface $output Output
      *
      * @throws \RuntimeException
      * @throws \InvalidArgumentException
@@ -149,6 +149,7 @@ class Create extends AbstractCommand
         $path = $this->getMigrationPath($input, $output);
 
         if (!file_exists($path)) {
+            /** @var \Symfony\Component\Console\Helper\QuestionHelper $helper */
             $helper = $this->getHelper('question');
             $question = $this->getCreateMigrationDirectoryQuestion();
 
@@ -164,12 +165,20 @@ class Create extends AbstractCommand
 
         $path = realpath($path);
         $className = $input->getArgument('name');
+        if ($className === null) {
+            $currentTimestamp = Util::getCurrentTimestamp();
+            $className = "V" . $currentTimestamp;
+            $fileName = $currentTimestamp . '.php';
+        } else {
+            if (!Util::isValidPhinxClassName($className)) {
+                throw new InvalidArgumentException(sprintf(
+                    'The migration class name "%s" is invalid. Please use CamelCase format.',
+                    $className
+                ));
+            }
 
-        if (!Util::isValidPhinxClassName($className)) {
-            throw new InvalidArgumentException(sprintf(
-                'The migration class name "%s" is invalid. Please use CamelCase format.',
-                $className
-            ));
+            // Compute the file path
+            $fileName = Util::mapClassNameToFileName($className);
         }
 
         if (!Util::isUniqueMigrationClassName($className, $path)) {
@@ -180,8 +189,6 @@ class Create extends AbstractCommand
             ));
         }
 
-        // Compute the file path
-        $fileName = Util::mapClassNameToFileName($className);
         $filePath = $path . DIRECTORY_SEPARATOR . $fileName;
 
         if (is_file($filePath)) {
@@ -289,6 +296,7 @@ class Create extends AbstractCommand
 
         // Do we need to do the post creation call to the creation class?
         if (isset($creationClass)) {
+            /** @var \Phinx\Migration\CreationInterface $creationClass */
             $creationClass->postMigrationCreation($filePath, $className, $this->getConfig()->getMigrationBaseClassName());
         }
 

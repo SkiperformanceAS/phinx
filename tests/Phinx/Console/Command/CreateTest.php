@@ -2,6 +2,8 @@
 
 namespace Test\Phinx\Console\Command;
 
+use Exception;
+use InvalidArgumentException;
 use Phinx\Config\Config;
 use Phinx\Config\ConfigInterface;
 use Phinx\Console\Command\Create;
@@ -13,6 +15,7 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Output\StreamOutput;
 use Symfony\Component\Console\Tester\CommandTester;
+use Test\Phinx\TestUtils;
 
 /**
  * Class CreateTest
@@ -36,8 +39,9 @@ class CreateTest extends TestCase
      */
     protected $output;
 
-    protected function setUp()
+    public function setUp(): void
     {
+        TestUtils::recursiveRmdir(sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'migrations');
         @mkdir(sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'migrations', 0777, true);
         $this->config = new Config(
             [
@@ -46,7 +50,7 @@ class CreateTest extends TestCase
                 ],
                 'environments' => [
                     'default_migration_table' => 'phinxlog',
-                    'default_database' => 'development',
+                    'default_environment' => 'development',
                     'development' => [
                         'adapter' => 'mysql',
                         'host' => 'fakehost',
@@ -69,13 +73,66 @@ class CreateTest extends TestCase
         $this->output = new StreamOutput(fopen('php://memory', 'a', false));
     }
 
-    /**
-     * @expectedException \InvalidArgumentException
-     * @expectedExceptionMessage The migration class name "MyDuplicateMigration" already exists
-     */
+    public function testCreateMigrationDefault(): void
+    {
+        $application = new PhinxApplication();
+        $application->add(new Create());
+
+        /** @var Create $command */
+        $command = $application->find('create');
+
+        /** @var Manager $managerStub mock the manager class */
+        $managerStub = $this->getMockBuilder('\Phinx\Migration\Manager')
+            ->setConstructorArgs([$this->config, $this->input, $this->output])
+            ->getMock();
+
+        $command->setConfig($this->config);
+        $command->setManager($managerStub);
+
+        $commandTester = new CommandTester($command);
+        $commandTester->execute(['command' => $command->getName()]);
+
+        $files = array_diff(scandir($this->config->getMigrationPaths()[0]), ['.', '..']);
+        $this->assertCount(1, $files);
+        $fileName = current($files);
+        $this->assertRegExp("/^[0-9]{14}.php/", $fileName);
+        $date = substr($fileName, 0, 14);
+        $this->assertFileExists($this->config->getMigrationPaths()[0]);
+        $prefix = "<?php\ndeclare(strict_types=1);\n\nuse Phinx\\Migration\\AbstractMigration;\n\nfinal class V{$date} extends AbstractMigration\n";
+        $this->assertStringStartsWith($prefix, file_get_contents($this->config->getMigrationPaths()[0] . DIRECTORY_SEPARATOR . $fileName));
+    }
+
+    public function testCreateMigrationWithName(): void
+    {
+        $application = new PhinxApplication();
+        $application->add(new Create());
+
+        /** @var Create $command */
+        $command = $application->find('create');
+
+        /** @var Manager $managerStub mock the manager class */
+        $managerStub = $this->getMockBuilder('\Phinx\Migration\Manager')
+            ->setConstructorArgs([$this->config, $this->input, $this->output])
+            ->getMock();
+
+        $command->setConfig($this->config);
+        $command->setManager($managerStub);
+
+        $commandTester = new CommandTester($command);
+        $commandTester->execute(['command' => $command->getName(), 'name' => 'MyMigration']);
+
+        $files = array_diff(scandir($this->config->getMigrationPaths()[0]), ['.', '..']);
+        $this->assertCount(1, $files);
+        $fileName = current($files);
+        $this->assertRegExp("/^[0-9]{14}_my_migration.php/", $fileName);
+        $this->assertFileExists($this->config->getMigrationPaths()[0]);
+        $prefix = "<?php\ndeclare(strict_types=1);\n\nuse Phinx\\Migration\\AbstractMigration;\n\nfinal class MyMigration extends AbstractMigration\n";
+        $this->assertStringStartsWith($prefix, file_get_contents($this->config->getMigrationPaths()[0] . DIRECTORY_SEPARATOR . $fileName));
+    }
+
     public function testExecuteWithDuplicateMigrationNames()
     {
-        $application = new PhinxApplication('testing');
+        $application = new PhinxApplication();
         $application->add(new Create());
 
         /** @var Create $command */
@@ -92,16 +149,16 @@ class CreateTest extends TestCase
         $commandTester = new CommandTester($command);
         $commandTester->execute(['command' => $command->getName(), 'name' => 'MyDuplicateMigration']);
         sleep(1.01); // need at least a second due to file naming scheme
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('The migration class name "MyDuplicateMigration" already exists');
+
         $commandTester->execute(['command' => $command->getName(), 'name' => 'MyDuplicateMigration']);
     }
 
-    /**
-     * @expectedException \InvalidArgumentException
-     * @expectedExceptionMessage The migration class name "Foo\Bar\MyDuplicateMigration" already exists
-     */
     public function testExecuteWithDuplicateMigrationNamesWithNamespace()
     {
-        $application = new PhinxApplication('testing');
+        $application = new PhinxApplication();
         $application->add(new Create());
 
         /** @var Create $command */
@@ -124,16 +181,16 @@ class CreateTest extends TestCase
         $commandTester = new CommandTester($command);
         $commandTester->execute(['command' => $command->getName(), 'name' => 'MyDuplicateMigration']);
         sleep(1.01); // need at least a second due to file naming scheme
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('The migration class name "Foo\Bar\MyDuplicateMigration" already exists');
+
         $commandTester->execute(['command' => $command->getName(), 'name' => 'MyDuplicateMigration']);
     }
 
-    /**
-     * @expectedException \Exception
-     * @expectedExceptionMessage Cannot use --template and --class at the same time
-     */
     public function testSupplyingBothClassAndTemplateAtCommandLineThrowsException()
     {
-        $application = new PhinxApplication('testing');
+        $application = new PhinxApplication();
         $application->add(new Create());
 
         /** @var Create $command $command */
@@ -148,16 +205,16 @@ class CreateTest extends TestCase
         $command->setManager($managerStub);
 
         $commandTester = new CommandTester($command);
+
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage('Cannot use --template and --class at the same time');
+
         $commandTester->execute(['command' => $command->getName(), 'name' => 'MyFailingMigration', '--template' => 'MyTemplate', '--class' => 'MyTemplateClass']);
     }
 
-    /**
-     * @expectedException \InvalidArgumentException
-     * @expectedExceptionMessage Cannot define template:class and template:file at the same time
-     */
     public function testSupplyingBothClassAndTemplateInConfigThrowsException()
     {
-        $application = new PhinxApplication('testing');
+        $application = new PhinxApplication();
         $application->add(new Create());
 
         /** @var Create $command $command */
@@ -177,6 +234,10 @@ class CreateTest extends TestCase
         $command->setManager($managerStub);
 
         $commandTester = new CommandTester($command);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Cannot define template:class and template:file at the same time');
+
         $commandTester->execute(['command' => $command->getName(), 'name' => 'MyFailingMigration']);
     }
 
@@ -219,7 +280,7 @@ class CreateTest extends TestCase
      */
     public function testTemplateGeneratorsWithoutCorrectInterfaceThrowsException(array $config, array $commandLine, $exceptionMessage)
     {
-        $application = new PhinxApplication('testing');
+        $application = new PhinxApplication();
         $application->add(new Create());
 
         /** @var Create $command $command */
@@ -239,8 +300,11 @@ class CreateTest extends TestCase
 
         $commandTester = new CommandTester($command);
 
-        $this->setExpectedException('\InvalidArgumentException', $exceptionMessage);
         $commandLine = array_merge(['command' => $command->getName(), 'name' => 'MyFailingMigration'], $commandLine);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage($exceptionMessage);
+
         $commandTester->execute($commandLine);
     }
 
@@ -259,7 +323,7 @@ class CreateTest extends TestCase
                 [],
                 [
                     'name' => 'Null2',
-                    '--class' => '\Test\Phinx\Console\Command\TemplateGenerators\NullGenerator'
+                    '--class' => '\Test\Phinx\Console\Command\TemplateGenerators\NullGenerator',
                 ],
             ],
             [
@@ -283,7 +347,7 @@ class CreateTest extends TestCase
      */
     public function testNullTemplateGeneratorsDoNotFail(array $config, array $commandLine)
     {
-        $application = new PhinxApplication('testing');
+        $application = new PhinxApplication();
         $application->add(new Create());
 
         /** @var Create $command $command */
@@ -323,7 +387,7 @@ class CreateTest extends TestCase
                 [],
                 [
                     'name' => 'Simple2',
-                    '--class' => '\Test\Phinx\Console\Command\TemplateGenerators\SimpleGenerator'
+                    '--class' => '\Test\Phinx\Console\Command\TemplateGenerators\SimpleGenerator',
                 ],
             ],
             [
@@ -347,7 +411,7 @@ class CreateTest extends TestCase
      */
     public function testSimpleTemplateGeneratorsIsCorrectlyPopulated(array $config, array $commandLine)
     {
-        $application = new PhinxApplication('testing');
+        $application = new PhinxApplication();
         $application->add(new Create());
 
         /** @var Create $command $command */
@@ -379,22 +443,5 @@ class CreateTest extends TestCase
         // Does the migration match our expectation?
         $expectedMigration = "useClassName Phinx\\Migration\\AbstractMigration / className {$commandLine['name']} / version {$match['Version']} / baseClassName AbstractMigration";
         $this->assertStringEqualsFile($match['MigrationFilename'], $expectedMigration, 'Failed to create migration file from template generator correctly.');
-    }
-
-    public function setExpectedException($exceptionName, $exceptionMessage = '', $exceptionCode = null)
-    {
-        if (method_exists($this, 'expectException')) {
-            //PHPUnit 5+
-            $this->expectException($exceptionName);
-            if ($exceptionMessage !== '') {
-                $this->expectExceptionMessage($exceptionMessage);
-            }
-            if ($exceptionCode !== null) {
-                $this->expectExceptionCode($exceptionCode);
-            }
-        } else {
-            //PHPUnit 4
-            parent::setExpectedException($exceptionName, $exceptionMessage, $exceptionCode);
-        }
     }
 }

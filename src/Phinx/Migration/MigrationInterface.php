@@ -21,17 +21,22 @@ interface MigrationInterface
     /**
      * @var string
      */
-    const CHANGE = 'change';
+    public const CHANGE = 'change';
 
     /**
      * @var string
      */
-    const UP = 'up';
+    public const UP = 'up';
 
     /**
      * @var string
      */
-    const DOWN = 'down';
+    public const DOWN = 'down';
+
+    /**
+     * @var string
+     */
+    public const INIT = 'init';
 
     /**
      * Sets the database adapter.
@@ -52,7 +57,7 @@ interface MigrationInterface
     /**
      * Sets the input object to be used in migration object
      *
-     * @param \Symfony\Component\Console\Input\InputInterface $input
+     * @param \Symfony\Component\Console\Input\InputInterface $input Input
      *
      * @return \Phinx\Migration\MigrationInterface
      */
@@ -68,7 +73,7 @@ interface MigrationInterface
     /**
      * Sets the output object to be used in migration object
      *
-     * @param \Symfony\Component\Console\Output\OutputInterface $output
+     * @param \Symfony\Component\Console\Output\OutputInterface $output Output
      *
      * @return \Phinx\Migration\MigrationInterface
      */
@@ -98,7 +103,7 @@ interface MigrationInterface
     /**
      * Sets the migration version number.
      *
-     * @param float $version Version
+     * @param int $version Version
      *
      * @return \Phinx\Migration\MigrationInterface
      */
@@ -107,7 +112,7 @@ interface MigrationInterface
     /**
      * Gets the migration version number.
      *
-     * @return float
+     * @return int
      */
     public function getVersion();
 
@@ -186,8 +191,8 @@ interface MigrationInterface
      *
      * @deprecated since 0.10.0. Use $this->table($tableName)->insert($data)->save() instead.
      *
-     * @param string $tableName
-     * @param array $data
+     * @param string $tableName Table name
+     * @param array $data Data
      *
      * @return void
      */
@@ -215,7 +220,7 @@ interface MigrationInterface
     /**
      * Checks to see if a table exists.
      *
-     * @param string $tableName Table Name
+     * @param string $tableName Table name
      *
      * @return bool
      */
@@ -226,7 +231,7 @@ interface MigrationInterface
      *
      * You can use this class to create and manipulate tables.
      *
-     * @param string $tableName Table Name
+     * @param string $tableName Table name
      * @param array $options Options
      *
      * @return \Phinx\Db\Table
@@ -237,7 +242,7 @@ interface MigrationInterface
      * Perform checks on the migration, print a warning
      * if there are potential problems.
      *
-     * @param string|null $direction
+     * @param string|null $direction Direction
      *
      * @return void
      */

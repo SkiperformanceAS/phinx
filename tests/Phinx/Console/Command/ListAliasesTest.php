@@ -28,7 +28,7 @@ class ListAliasesTest extends TestCase
      */
     public function testListingAliases($file, $hasAliases)
     {
-        $command = (new PhinxApplication('testing'))->find('list:aliases');
+        $command = (new PhinxApplication())->find('list:aliases');
         $commandTester = new CommandTester($command);
         $commandTester->execute(
             [
@@ -41,13 +41,13 @@ class ListAliasesTest extends TestCase
         $display = $commandTester->getDisplay(false);
 
         if ($hasAliases) {
-            $this->assertNotContains('No aliases defined in ', $display);
-            $this->assertContains('Alias            Class                                             ', $display);
-            $this->assertContains('================ ==================================================', $display);
-            $this->assertContains('MakePermission   Vendor\Package\Migration\Creation\MakePermission  ', $display);
-            $this->assertContains('RemovePermission Vendor\Package\Migration\Creation\RemovePermission', $display);
+            $this->assertStringNotContainsString('No aliases defined in ', $display);
+            $this->assertStringContainsString('Alias            Class                                             ', $display);
+            $this->assertStringContainsString('================ ==================================================', $display);
+            $this->assertStringContainsString('MakePermission   Vendor\Package\Migration\Creation\MakePermission  ', $display);
+            $this->assertStringContainsString('RemovePermission Vendor\Package\Migration\Creation\RemovePermission', $display);
         } else {
-            $this->assertContains('No aliases defined in ', $display);
+            $this->assertStringContainsString('No aliases defined in ', $display);
         }
     }
 }

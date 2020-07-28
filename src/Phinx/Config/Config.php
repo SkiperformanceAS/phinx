@@ -9,6 +9,8 @@ namespace Phinx\Config;
 
 use Closure;
 use InvalidArgumentException;
+use Phinx\Db\Adapter\SQLiteAdapter;
+use Phinx\Util\Util;
 use RuntimeException;
 use Symfony\Component\Yaml\Yaml;
 use UnexpectedValueException;
@@ -26,17 +28,17 @@ class Config implements ConfigInterface, NamespaceAwareInterface
     /**
      * The value that identifies a version order by creation time.
      */
-    const VERSION_ORDER_CREATION_TIME = 'creation';
+    public const VERSION_ORDER_CREATION_TIME = 'creation';
 
     /**
      * The value that identifies a version order by execution time.
      */
-    const VERSION_ORDER_EXECUTION_TIME = 'execution';
+    public const VERSION_ORDER_EXECUTION_TIME = 'execution';
 
     /**
      * @var array
      */
-    private $values = [];
+    protected $values = [];
 
     /**
      * @var string
@@ -63,6 +65,12 @@ class Config implements ConfigInterface, NamespaceAwareInterface
      */
     public static function fromYaml($configFilePath)
     {
+        if (!class_exists('Symfony\\Component\\Yaml\\Yaml', true)) {
+            // @codeCoverageIgnoreStart
+            throw new RuntimeException('Missing yaml parser, symfony/yaml package is not installed.');
+            // @codeCoverageIgnoreEnd
+        }
+
         $configFile = file_get_contents($configFilePath);
         $configArray = Yaml::parse($configFile);
 
@@ -88,7 +96,9 @@ class Config implements ConfigInterface, NamespaceAwareInterface
     public static function fromJson($configFilePath)
     {
         if (!function_exists('json_decode')) {
+            // @codeCoverageIgnoreStart
             throw new RuntimeException("Need to install JSON PHP extension to use JSON config");
+            // @codeCoverageIgnoreEnd
         }
 
         $configArray = json_decode(file_get_contents($configFilePath), true);
@@ -162,7 +172,15 @@ class Config implements ConfigInterface, NamespaceAwareInterface
                     $this->values['environments']['default_migration_table'];
             }
 
-            return $environments[$name];
+            if (
+                isset($environments[$name]['adapter'])
+                && $environments[$name]['adapter'] === 'sqlite'
+                && !empty($environments[$name]['memory'])
+            ) {
+                $environments[$name]['name'] = SQLiteAdapter::MEMORY;
+            }
+
+            return $this->parseAgnosticDsn($environments[$name]);
         }
 
         return null;
@@ -194,16 +212,21 @@ class Config implements ConfigInterface, NamespaceAwareInterface
             ));
         }
 
-        // if the user has configured a default database then use it,
-        // providing it actually exists!
+        // deprecated: to be removed 0.13
         if (isset($this->values['environments']['default_database'])) {
-            if ($this->getEnvironment($this->values['environments']['default_database'])) {
-                return $this->values['environments']['default_database'];
+            $this->values['environments']['default_environment'] = $this->values['environments']['default_database'];
+        }
+
+        // if the user has configured a default environment then use it,
+        // providing it actually exists!
+        if (isset($this->values['environments']['default_environment'])) {
+            if ($this->getEnvironment($this->values['environments']['default_environment'])) {
+                return $this->values['environments']['default_environment'];
             }
 
             throw new RuntimeException(sprintf(
                 'The environment configuration for \'%s\' is missing',
-                $this->values['environments']['default_database']
+                $this->values['environments']['default_environment']
             ));
         }
 
@@ -292,6 +315,19 @@ class Config implements ConfigInterface, NamespaceAwareInterface
     }
 
     /**
+     * Gets the base class name for seeders.
+     *
+     * @param bool $dropNamespace Return the base seeder class name without the namespace.
+     * @return string
+     */
+    public function getSeedBaseClassName($dropNamespace = true)
+    {
+        $className = !isset($this->values['seed_base_class']) ? 'Phinx\Seed\AbstractSeed' : $this->values['seed_base_class'];
+
+        return $dropNamespace ? substr(strrchr($className, '\\'), 1) : $className;
+    }
+
+    /**
      * Get the template file name.
      *
      * @return string|false
@@ -317,6 +353,30 @@ class Config implements ConfigInterface, NamespaceAwareInterface
         }
 
         return $this->values['templates']['class'];
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function getDataDomain()
+    {
+        if (!isset($this->values['data_domain'])) {
+            return [];
+        }
+
+        return $this->values['data_domain'];
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function getContainer()
+    {
+        if (!isset($this->values['container'])) {
+            return null;
+        }
+
+        return $this->values['container'];
     }
 
     /**
@@ -391,7 +451,7 @@ class Config implements ConfigInterface, NamespaceAwareInterface
      * Recurse an array for the specified tokens and replace them.
      *
      * @param array $arr Array to recurse
-     * @param array $tokens Array of tokens to search for
+     * @param string[] $tokens Array of tokens to search for
      *
      * @return array
      */
@@ -414,6 +474,25 @@ class Config implements ConfigInterface, NamespaceAwareInterface
         }
 
         return $out;
+    }
+
+    /**
+     * Parse a database-agnostic DSN into individual options.
+     *
+     * @param array $options Options
+     *
+     * @return array
+     */
+    protected function parseAgnosticDsn(array $options)
+    {
+        $parsed = Util::parseDsn($options['dsn'] ?? '');
+        if ($parsed) {
+            unset($options['dsn']);
+        }
+
+        $options = array_merge($parsed, $options);
+
+        return $options;
     }
 
     /**

@@ -2,10 +2,12 @@
 
 namespace Test\Phinx\Migration;
 
+use InvalidArgumentException;
 use Phinx\Config\Config;
 use Phinx\Console\Command\AbstractCommand;
 use Phinx\Migration\Manager;
 use PHPUnit\Framework\TestCase;
+use RuntimeException;
 use Symfony\Component\Console\Input\ArrayInput;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
@@ -31,7 +33,7 @@ class ManagerTest extends TestCase
      */
     private $manager;
 
-    protected function setUp()
+    public function setUp(): void
     {
         $this->config = new Config($this->getConfigArray());
         $this->input = new ArrayInput([]);
@@ -80,7 +82,7 @@ class ManagerTest extends TestCase
         return $config;
     }
 
-    protected function tearDown()
+    public function tearDown(): void
     {
         $this->manager = null;
     }
@@ -104,16 +106,16 @@ class ManagerTest extends TestCase
             ],
             'environments' => [
                 'default_migration_table' => 'phinxlog',
-                'default_database' => 'production',
-                'production' => [
-                    'adapter' => 'mysql',
-                    'host' => TESTS_PHINX_DB_ADAPTER_MYSQL_HOST,
-                    'name' => TESTS_PHINX_DB_ADAPTER_MYSQL_DATABASE,
-                    'user' => TESTS_PHINX_DB_ADAPTER_MYSQL_USERNAME,
-                    'pass' => TESTS_PHINX_DB_ADAPTER_MYSQL_PASSWORD,
-                    'port' => TESTS_PHINX_DB_ADAPTER_MYSQL_PORT
-                ]
-            ]
+                'default_environment' => 'production',
+                'production' => defined('MYSQL_DB_CONFIG') ? MYSQL_DB_CONFIG : [],
+            ],
+            'data_domain' => [
+                'phone_number' => [
+                    'type' => 'string',
+                    'null' => true,
+                    'length' => 15,
+                ],
+            ],
         ];
     }
 
@@ -123,6 +125,17 @@ class ManagerTest extends TestCase
             'Symfony\Component\Console\Output\StreamOutput',
             $this->manager->getOutput()
         );
+    }
+
+    /**
+     *
+     */
+    public function testEnvironmentInheritsDataDomainOptions()
+    {
+        foreach ($this->config->getEnvironments() as $name => $opts) {
+            $env = $this->manager->getEnvironment($name);
+            $this->assertArrayHasKey('data_domain', $env->getOptions());
+        }
     }
 
     public function testPrintStatusMethod()
@@ -190,12 +203,12 @@ class ManagerTest extends TestCase
                                 'end_time' => '2012-01-16 18:35:41',
                                 'migration_name' => '',
                                 'breakpoint' => '0',
-                            ]
+                            ],
                     ]
                 ));
         $this->manager->setEnvironments(['mockenv' => $envStub]);
         $this->manager->getOutput()->setDecorated(false);
-        $return = $this->manager->printStatus('mockenv', 'json');
+        $return = $this->manager->printStatus('mockenv', AbstractCommand::FORMAT_JSON);
         $this->assertSame(['hasMissingMigration' => false, 'hasDownMigration' => false], $return);
         rewind($this->manager->getOutput()->getStream());
         $outputStr = trim(stream_get_contents($this->manager->getOutput()->getStream()));
@@ -536,7 +549,7 @@ class ManagerTest extends TestCase
                                 'start_time' => '2012-01-16 18:35:40',
                                 'end_time' => '2012-01-16 18:35:41',
                                 'migration_name' => '',
-                                'breakpoint' => 0
+                                'breakpoint' => 0,
                             ],
                         '20120116183504' =>
                             [
@@ -587,7 +600,7 @@ class ManagerTest extends TestCase
                                 'start_time' => '2016-01-16 18:35:40',
                                 'end_time' => '2016-01-16 18:35:41',
                                 'migration_name' => '',
-                                'breakpoint' => 0
+                                'breakpoint' => 0,
                             ],
                         '20160116183504' =>
                             [
@@ -639,7 +652,7 @@ class ManagerTest extends TestCase
                                 'start_time' => '2012-01-16 18:35:40',
                                 'end_time' => '2012-01-16 18:35:41',
                                 'migration_name' => '',
-                                'breakpoint' => 0
+                                'breakpoint' => 0,
                             ],
                         '20120116183504' =>
                             [
@@ -655,7 +668,7 @@ class ManagerTest extends TestCase
                                 'start_time' => '2015-01-16 18:35:40',
                                 'end_time' => '2015-01-16 18:35:41',
                                 'migration_name' => '',
-                                'breakpoint' => 0
+                                'breakpoint' => 0,
                             ],
                         '20150116183504' =>
                             [
@@ -671,7 +684,7 @@ class ManagerTest extends TestCase
                                 'start_time' => '2016-01-16 18:35:40',
                                 'end_time' => '2016-01-16 18:35:41',
                                 'migration_name' => '',
-                                'breakpoint' => 0
+                                'breakpoint' => 0,
                             ],
                         '20160116183504' =>
                             [
@@ -769,7 +782,7 @@ class ManagerTest extends TestCase
                         'start_time' => '2012-01-16 18:35:40',
                         'end_time' => '2012-01-16 18:35:41',
                         'migration_name' => '',
-                        'breakpoint' => 0
+                        'breakpoint' => 0,
                     ]]));
 
         $this->manager->setEnvironments(['mockenv' => $envStub]);
@@ -797,7 +810,7 @@ class ManagerTest extends TestCase
                         'start_time' => '2016-01-16 18:35:40',
                         'end_time' => '2016-01-16 18:35:41',
                         'migration_name' => '',
-                        'breakpoint' => 0
+                        'breakpoint' => 0,
                     ]]));
 
         $this->manager->setEnvironments(['mockenv' => $envStub]);
@@ -828,7 +841,7 @@ class ManagerTest extends TestCase
                                 'start_time' => '2012-01-16 18:35:40',
                                 'end_time' => '2012-01-16 18:35:41',
                                 'migration_name' => '',
-                                'breakpoint' => 0
+                                'breakpoint' => 0,
                             ],
                         '20120116183504' =>
                             [
@@ -844,7 +857,7 @@ class ManagerTest extends TestCase
                                 'start_time' => '2015-01-16 18:35:40',
                                 'end_time' => '2015-01-16 18:35:41',
                                 'migration_name' => '',
-                                'breakpoint' => 0
+                                'breakpoint' => 0,
                             ],
                     ]
                 ));
@@ -886,7 +899,7 @@ class ManagerTest extends TestCase
                             'start_time' => '2012-01-16 18:35:40',
                             'end_time' => '2012-01-16 18:35:41',
                             'migration_name' => '',
-                            'breakpoint' => 0
+                            'breakpoint' => 0,
                         ],
                     '20120103083300' =>
                         [
@@ -935,7 +948,7 @@ class ManagerTest extends TestCase
                             'start_time' => '2016-01-16 18:35:40',
                             'end_time' => '2016-01-16 18:35:41',
                             'migration_name' => '',
-                            'breakpoint' => 0
+                            'breakpoint' => 0,
                         ],
                     '20160103083300' =>
                         [
@@ -985,7 +998,7 @@ class ManagerTest extends TestCase
                             'start_time' => '2012-01-16 18:35:40',
                             'end_time' => '2012-01-16 18:35:41',
                             'migration_name' => '',
-                            'breakpoint' => 0
+                            'breakpoint' => 0,
                         ],
                     '20120116183504' =>
                         [
@@ -993,7 +1006,7 @@ class ManagerTest extends TestCase
                             'start_time' => '2012-01-16 18:35:43',
                             'end_time' => '2012-01-16 18:35:44',
                             'migration_name' => '',
-                            'breakpoint' => 0
+                            'breakpoint' => 0,
                         ],
                     '20150111235330' =>
                         [
@@ -1001,7 +1014,7 @@ class ManagerTest extends TestCase
                             'start_time' => '2015-01-16 18:35:40',
                             'end_time' => '2015-01-16 18:35:41',
                             'migration_name' => '',
-                            'breakpoint' => 0
+                            'breakpoint' => 0,
                         ],
                 ]));
 
@@ -1051,7 +1064,7 @@ class ManagerTest extends TestCase
         $this->assertEquals(['hasMissingMigration' => false, 'hasDownMigration' => true], $return);
 
         $outputStr = $this->manager->getOutput()->fetch();
-        $this->assertContains($expectedStatusHeader, $outputStr);
+        $this->assertStringContainsString($expectedStatusHeader, $outputStr);
     }
 
     public function statusVersionOrderProvider()
@@ -1070,23 +1083,19 @@ class ManagerTest extends TestCase
         return [
             'With the default version order' => [
                 $configWithNoVersionOrder,
-                ' Status  <info>[Migration ID]</info>  Started              Finished             Migration Name '
+                ' Status  <info>[Migration ID]</info>  Started              Finished             Migration Name ',
             ],
             'With the creation version order' => [
                 $configWithCreationVersionOrder,
-                ' Status  <info>[Migration ID]</info>  Started              Finished             Migration Name '
+                ' Status  <info>[Migration ID]</info>  Started              Finished             Migration Name ',
             ],
             'With the execution version order' => [
                 $configWithExecutionVersionOrder,
-                ' Status  Migration ID    <info>[Started          ]</info>  Finished             Migration Name '
-            ]
+                ' Status  Migration ID    <info>[Started          ]</info>  Finished             Migration Name ',
+            ],
         ];
     }
 
-    /**
-     * @expectedException RuntimeException
-     * @expectedExceptionMessage Invalid version_order configuration option
-     */
     public function testPrintStatusInvalidVersionOrderKO()
     {
         // stub environment
@@ -1101,110 +1110,114 @@ class ManagerTest extends TestCase
         $this->manager = new Manager($config, $this->input, $this->output);
 
         $this->manager->setEnvironments(['mockenv' => $envStub]);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Invalid version_order configuration option');
+
         $this->manager->printStatus('mockenv');
     }
 
     public function testGetMigrationsWithDuplicateMigrationVersions()
     {
-        $this->setExpectedException(
-            'InvalidArgumentException',
-            'Duplicate migration - "' . $this->getCorrectedPath(__DIR__ . '/_files/duplicateversions/20120111235330_duplicate_migration_2.php') . '" has the same version as "20120111235330"'
-        );
         $config = new Config(['paths' => ['migrations' => $this->getCorrectedPath(__DIR__ . '/_files/duplicateversions')]]);
         $manager = new Manager($config, $this->input, $this->output);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Duplicate migration - "' . $this->getCorrectedPath(__DIR__ . '/_files/duplicateversions/20120111235330_duplicate_migration_2.php') . '" has the same version as "20120111235330"');
+
         $manager->getMigrations('mockenv');
     }
 
     public function testGetMigrationsWithDuplicateMigrationVersionsWithNamespace()
     {
-        $this->setExpectedException(
-            'InvalidArgumentException',
-            'Duplicate migration - "' . $this->getCorrectedPath(__DIR__ . '/_files_foo_bar/duplicateversions/20160111235330_duplicate_migration_2.php') . '" has the same version as "20160111235330"'
-        );
         $config = new Config(['paths' => ['migrations' => ['Foo\Bar' => $this->getCorrectedPath(__DIR__ . '/_files_foo_bar/duplicateversions')]]]);
         $manager = new Manager($config, $this->input, $this->output);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Duplicate migration - "' . $this->getCorrectedPath(__DIR__ . '/_files_foo_bar/duplicateversions/20160111235330_duplicate_migration_2.php') . '" has the same version as "20160111235330"');
+
         $manager->getMigrations('mockenv');
     }
 
     public function testGetMigrationsWithDuplicateMigrationVersionsWithMixedNamespace()
     {
-        $this->setExpectedException(
-            'InvalidArgumentException',
-            'Duplicate migration - "' . $this->getCorrectedPath(__DIR__ . '/_files_baz/duplicateversions_mix_ns/20120111235330_duplicate_migration_mixed_namespace_2.php') . '" has the same version as "20120111235330"'
-        );
         $config = new Config(['paths' => [
             'migrations' => [
                 $this->getCorrectedPath(__DIR__ . '/_files/duplicateversions_mix_ns'),
                 'Baz' => $this->getCorrectedPath(__DIR__ . '/_files_baz/duplicateversions_mix_ns'),
-            ]
+            ],
         ]]);
         $manager = new Manager($config, $this->input, $this->output);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Duplicate migration - "' . $this->getCorrectedPath(__DIR__ . '/_files_baz/duplicateversions_mix_ns/20120111235330_duplicate_migration_mixed_namespace_2.php') . '" has the same version as "20120111235330"');
+
         $manager->getMigrations('mockenv');
     }
 
     public function testGetMigrationsWithDuplicateMigrationNames()
     {
-        $this->setExpectedException(
-            'InvalidArgumentException',
-            'Migration "20120111235331_duplicate_migration_name.php" has the same name as "20120111235330_duplicate_migration_name.php"'
-        );
         $config = new Config(['paths' => ['migrations' => $this->getCorrectedPath(__DIR__ . '/_files/duplicatenames')]]);
         $manager = new Manager($config, $this->input, $this->output);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Migration "20120111235331_duplicate_migration_name.php" has the same name as "20120111235330_duplicate_migration_name.php"');
+
         $manager->getMigrations('mockenv');
     }
 
     public function testGetMigrationsWithDuplicateMigrationNamesWithNamespace()
     {
-        $this->setExpectedException(
-            'InvalidArgumentException',
-            'Migration "20160111235331_duplicate_migration_name.php" has the same name as "20160111235330_duplicate_migration_name.php"'
-        );
         $config = new Config(['paths' => ['migrations' => ['Foo\Bar' => $this->getCorrectedPath(__DIR__ . '/_files_foo_bar/duplicatenames')]]]);
         $manager = new Manager($config, $this->input, $this->output);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Migration "20160111235331_duplicate_migration_name.php" has the same name as "20160111235330_duplicate_migration_name.php"');
+
         $manager->getMigrations('mockenv');
     }
 
     public function testGetMigrationsWithInvalidMigrationClassName()
     {
-        $this->setExpectedException(
-            'InvalidArgumentException',
-            'Could not find class "InvalidClass" in file "' . $this->getCorrectedPath(__DIR__ . '/_files/invalidclassname/20120111235330_invalid_class.php') . '"'
-        );
         $config = new Config(['paths' => ['migrations' => $this->getCorrectedPath(__DIR__ . '/_files/invalidclassname')]]);
         $manager = new Manager($config, $this->input, $this->output);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Could not find class "InvalidClass" in file "' . $this->getCorrectedPath(__DIR__ . '/_files/invalidclassname/20120111235330_invalid_class.php') . '"');
+
         $manager->getMigrations('mockenv');
     }
 
     public function testGetMigrationsWithInvalidMigrationClassNameWithNamespace()
     {
-        $this->setExpectedException(
-            'InvalidArgumentException',
-            'Could not find class "Foo\Bar\InvalidClass" in file "' . $this->getCorrectedPath(__DIR__ . '/_files_foo_bar/invalidclassname/20160111235330_invalid_class.php') . '"'
-        );
         $config = new Config(['paths' => ['migrations' => ['Foo\Bar' => $this->getCorrectedPath(__DIR__ . '/_files_foo_bar/invalidclassname')]]]);
         $manager = new Manager($config, $this->input, $this->output);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Could not find class "Foo\Bar\InvalidClass" in file "' . $this->getCorrectedPath(__DIR__ . '/_files_foo_bar/invalidclassname/20160111235330_invalid_class.php') . '"');
+
         $manager->getMigrations('mockenv');
     }
 
     public function testGetMigrationsWithClassThatDoesntExtendAbstractMigration()
     {
-        $this->setExpectedException(
-            'InvalidArgumentException',
-            'The class "InvalidSuperClass" in file "' . $this->getCorrectedPath(__DIR__ . '/_files/invalidsuperclass/20120111235330_invalid_super_class.php') . '" must extend \Phinx\Migration\AbstractMigration'
-        );
         $config = new Config(['paths' => ['migrations' => $this->getCorrectedPath(__DIR__ . '/_files/invalidsuperclass')]]);
         $manager = new Manager($config, $this->input, $this->output);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('The class "InvalidSuperClass" in file "' . $this->getCorrectedPath(__DIR__ . '/_files/invalidsuperclass/20120111235330_invalid_super_class.php') . '" must extend \Phinx\Migration\AbstractMigration');
+
         $manager->getMigrations('mockenv');
     }
 
     public function testGetMigrationsWithClassThatDoesntExtendAbstractMigrationWithNamespace()
     {
-        $this->setExpectedException(
-            'InvalidArgumentException',
-            'The class "Foo\Bar\InvalidSuperClass" in file "' . $this->getCorrectedPath(__DIR__ . '/_files_foo_bar/invalidsuperclass/20160111235330_invalid_super_class.php') . '" must extend \Phinx\Migration\AbstractMigration'
-        );
         $config = new Config(['paths' => ['migrations' => ['Foo\Bar' => $this->getCorrectedPath(__DIR__ . '/_files_foo_bar/invalidsuperclass')]]]);
         $manager = new Manager($config, $this->input, $this->output);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('The class "Foo\Bar\InvalidSuperClass" in file "' . $this->getCorrectedPath(__DIR__ . '/_files_foo_bar/invalidsuperclass/20160111235330_invalid_super_class.php') . '" must extend \Phinx\Migration\AbstractMigration');
+
         $manager->getMigrations('mockenv');
     }
 
@@ -1222,7 +1235,7 @@ class ManagerTest extends TestCase
      *
      * @dataProvider migrateDateDataProvider
      *
-     * @param array  $availableMigrations
+     * @param string[] $availableMigrations
      * @param string $dateString
      * @param string $expectedMigration
      * @param string $message
@@ -1248,7 +1261,7 @@ class ManagerTest extends TestCase
         if (is_null($expectedMigration)) {
             $this->assertEmpty($output, $message);
         } else {
-            $this->assertContains($expectedMigration, $output, $message);
+            $this->assertStringContainsString($expectedMigration, $output, $message);
         }
     }
 
@@ -1280,7 +1293,7 @@ class ManagerTest extends TestCase
             }
 
             foreach ($expectedOutput as $expectedLine) {
-                $this->assertContains($expectedLine, $output);
+                $this->assertStringContainsString($expectedLine, $output);
             }
         }
     }
@@ -1314,7 +1327,7 @@ class ManagerTest extends TestCase
             }
 
             foreach ($expectedOutput as $expectedLine) {
-                $this->assertContains($expectedLine, $output);
+                $this->assertStringContainsString($expectedLine, $output);
             }
         }
     }
@@ -1348,7 +1361,7 @@ class ManagerTest extends TestCase
             }
 
             foreach ($expectedOutput as $expectedLine) {
-                $this->assertContains($expectedLine, $output);
+                $this->assertStringContainsString($expectedLine, $output);
             }
         }
     }
@@ -1381,7 +1394,7 @@ class ManagerTest extends TestCase
             }
 
             foreach ($expectedOutput as $expectedLine) {
-                $this->assertContains($expectedLine, $output);
+                $this->assertStringContainsString($expectedLine, $output);
             }
         }
     }
@@ -1415,7 +1428,7 @@ class ManagerTest extends TestCase
             }
 
             foreach ($expectedOutput as $expectedLine) {
-                $this->assertContains($expectedLine, $output);
+                $this->assertStringContainsString($expectedLine, $output);
             }
         }
     }
@@ -1449,7 +1462,7 @@ class ManagerTest extends TestCase
             }
 
             foreach ($expectedOutput as $expectedLine) {
-                $this->assertContains($expectedLine, $output);
+                $this->assertStringContainsString($expectedLine, $output);
             }
         }
     }
@@ -1492,7 +1505,7 @@ class ManagerTest extends TestCase
             }
 
             foreach ($expectedOutput as $expectedLine) {
-                $this->assertContains($expectedLine, $output);
+                $this->assertStringContainsString($expectedLine, $output);
             }
         }
     }
@@ -1535,7 +1548,7 @@ class ManagerTest extends TestCase
             }
 
             foreach ($expectedOutput as $expectedLine) {
-                $this->assertContains($expectedLine, $output);
+                $this->assertStringContainsString($expectedLine, $output);
             }
         }
     }
@@ -1577,7 +1590,7 @@ class ManagerTest extends TestCase
             }
 
             foreach ($expectedOutput as $expectedLine) {
-                $this->assertContains($expectedLine, $output);
+                $this->assertStringContainsString($expectedLine, $output);
             }
         }
     }
@@ -1620,7 +1633,7 @@ class ManagerTest extends TestCase
             }
 
             foreach ($expectedOutput as $expectedLine) {
-                $this->assertContains($expectedLine, $output);
+                $this->assertStringContainsString($expectedLine, $output);
             }
         }
     }
@@ -1662,7 +1675,7 @@ class ManagerTest extends TestCase
             }
 
             foreach ($expectedOutput as $expectedLine) {
-                $this->assertContains($expectedLine, $output);
+                $this->assertStringContainsString($expectedLine, $output);
             }
         }
     }
@@ -1686,10 +1699,10 @@ class ManagerTest extends TestCase
         $this->manager->rollback('mockenv');
         rewind($this->manager->getOutput()->getStream());
         $output = stream_get_contents($this->manager->getOutput()->getStream());
-        $this->assertContains('== 20120111235330 TestMigration: reverting', $output);
-        $this->assertContains('== 20120111235330 TestMigration: reverted', $output);
-        $this->assertNotContains('No migrations to rollback', $output);
-        $this->assertNotContains('Undefined offset: -1', $output);
+        $this->assertStringContainsString('== 20120111235330 TestMigration: reverting', $output);
+        $this->assertStringContainsString('== 20120111235330 TestMigration: reverted', $output);
+        $this->assertStringNotContainsString('No migrations to rollback', $output);
+        $this->assertStringNotContainsString('Undefined offset: -1', $output);
     }
 
     public function testRollbackToVersionWithTwoMigrationsDoesNotRollbackBothMigrations()
@@ -1723,7 +1736,7 @@ class ManagerTest extends TestCase
         $this->manager->rollback('mockenv');
         rewind($this->manager->getOutput()->getStream());
         $output = stream_get_contents($this->manager->getOutput()->getStream());
-        $this->assertNotContains('== 20120111235330 TestMigration: reverting', $output);
+        $this->assertStringNotContainsString('== 20120111235330 TestMigration: reverting', $output);
     }
 
     public function testRollbackToVersionWithTwoMigrationsDoesNotRollbackBothMigrationsWithNamespace()
@@ -1758,7 +1771,7 @@ class ManagerTest extends TestCase
         $this->manager->rollback('mockenv');
         rewind($this->manager->getOutput()->getStream());
         $output = stream_get_contents($this->manager->getOutput()->getStream());
-        $this->assertNotContains('== 20160111235330 Foo\Bar\TestMigration: reverting', $output);
+        $this->assertStringNotContainsString('== 20160111235330 Foo\Bar\TestMigration: reverting', $output);
     }
 
     public function testRollbackToVersionWithTwoMigrationsDoesNotRollbackBothMigrationsWithMixedNamespace()
@@ -1793,8 +1806,8 @@ class ManagerTest extends TestCase
         $this->manager->rollback('mockenv');
         rewind($this->manager->getOutput()->getStream());
         $output = stream_get_contents($this->manager->getOutput()->getStream());
-        $this->assertContains('== 20150116183504 Baz\TestMigration2: reverting', $output);
-        $this->assertNotContains('== 20160111235330 TestMigration: reverting', $output);
+        $this->assertStringContainsString('== 20150116183504 Baz\TestMigration2: reverting', $output);
+        $this->assertStringNotContainsString('== 20160111235330 TestMigration: reverting', $output);
     }
 
     /**
@@ -1832,7 +1845,7 @@ class ManagerTest extends TestCase
             }
 
             foreach ($expectedOutput as $expectedLine) {
-                $this->assertContains($expectedLine, $output);
+                $this->assertStringContainsString($expectedLine, $output);
             }
         }
     }
@@ -1871,7 +1884,7 @@ class ManagerTest extends TestCase
             }
 
             foreach ($expectedOutput as $expectedLine) {
-                $this->assertContains($expectedLine, $output);
+                $this->assertStringContainsString($expectedLine, $output);
             }
         }
     }
@@ -1910,7 +1923,7 @@ class ManagerTest extends TestCase
             }
 
             foreach ($expectedOutput as $expectedLine) {
-                $this->assertContains($expectedLine, $output);
+                $this->assertStringContainsString($expectedLine, $output);
             }
         }
     }
@@ -1948,7 +1961,7 @@ class ManagerTest extends TestCase
                         '20120116183504' => ['version' => '20120116183504', 'migration_name' => '', 'breakpoint' => 0],
                     ],
                     '20130118000000',
-                    null
+                    null,
                 ],
             'Rollback to date of the most recent migration - no breakpoints set' =>
                 [
@@ -1957,7 +1970,7 @@ class ManagerTest extends TestCase
                         '20120116183504' => ['version' => '20120116183504', 'migration_name' => '', 'breakpoint' => 0],
                     ],
                     '20120116183504',
-                    null
+                    null,
                 ],
             'Rollback to date between 2 migrations - no breakpoints set' =>
                 [
@@ -1966,7 +1979,7 @@ class ManagerTest extends TestCase
                         '20120116183504' => ['version' => '20120116183504', 'migration_name' => '', 'breakpoint' => 0],
                     ],
                     '20120115',
-                    '== 20120116183504 TestMigration2: reverted'
+                    '== 20120116183504 TestMigration2: reverted',
                 ],
             'Rollback to date of the oldest migration - no breakpoints set' =>
                 [
@@ -1975,7 +1988,7 @@ class ManagerTest extends TestCase
                         '20120116183504' => ['version' => '20120116183504', 'migration_name' => '', 'breakpoint' => 0],
                     ],
                     '20120111235330',
-                    '== 20120116183504 TestMigration2: reverted'
+                    '== 20120116183504 TestMigration2: reverted',
                 ],
             'Rollback to date before all the migrations - no breakpoints set' =>
                 [
@@ -1984,7 +1997,7 @@ class ManagerTest extends TestCase
                         '20120116183504' => ['version' => '20120116183504', 'migration_name' => '', 'breakpoint' => 0],
                     ],
                     '20110115',
-                    ['== 20120116183504 TestMigration2: reverted', '== 20120111235330 TestMigration: reverted']
+                    ['== 20120116183504 TestMigration2: reverted', '== 20120111235330 TestMigration: reverted'],
                 ],
 
             // Breakpoint set on first migration
@@ -1996,7 +2009,7 @@ class ManagerTest extends TestCase
                         '20120116183504' => ['version' => '20120116183504', 'migration_name' => '', 'breakpoint' => 0],
                     ],
                     '20130118000000',
-                    null
+                    null,
                 ],
             'Rollback to date of the most recent migration - breakpoint set on first migration' =>
                 [
@@ -2005,7 +2018,7 @@ class ManagerTest extends TestCase
                         '20120116183504' => ['version' => '20120116183504', 'migration_name' => '', 'breakpoint' => 0],
                     ],
                     '20120116183504',
-                    null
+                    null,
                 ],
             'Rollback to date between 2 migrations - breakpoint set on first migration' =>
                 [
@@ -2014,7 +2027,7 @@ class ManagerTest extends TestCase
                         '20120116183504' => ['version' => '20120116183504', 'migration_name' => '', 'breakpoint' => 0],
                     ],
                     '20120115',
-                    '== 20120116183504 TestMigration2: reverted'
+                    '== 20120116183504 TestMigration2: reverted',
                 ],
             'Rollback to date of the oldest migration - breakpoint set on first migration' =>
                 [
@@ -2023,7 +2036,7 @@ class ManagerTest extends TestCase
                         '20120116183504' => ['version' => '20120116183504', 'migration_name' => '', 'breakpoint' => 0],
                     ],
                     '20120111235330',
-                    '== 20120116183504 TestMigration2: reverted'
+                    '== 20120116183504 TestMigration2: reverted',
                 ],
             'Rollback to date before all the migrations - breakpoint set on first migration' =>
                 [
@@ -2032,7 +2045,7 @@ class ManagerTest extends TestCase
                         '20120116183504' => ['version' => '20120116183504', 'migration_name' => '', 'breakpoint' => 0],
                     ],
                     '20110115',
-                    'Breakpoint reached. Further rollbacks inhibited.'
+                    'Breakpoint reached. Further rollbacks inhibited.',
                 ],
 
             // Breakpoint set on last migration
@@ -2044,7 +2057,7 @@ class ManagerTest extends TestCase
                         '20120116183504' => ['version' => '20120116183504', 'migration_name' => '', 'breakpoint' => 1],
                     ],
                     '20130118000000',
-                    null
+                    null,
                 ],
             'Rollback to date of the most recent migration - breakpoint set on last migration' =>
                 [
@@ -2053,7 +2066,7 @@ class ManagerTest extends TestCase
                         '20120116183504' => ['version' => '20120116183504', 'migration_name' => '', 'breakpoint' => 1],
                     ],
                     '20120116183504',
-                    null
+                    null,
                 ],
             'Rollback to date between 2 migrations - breakpoint set on last migration' =>
                 [
@@ -2062,7 +2075,7 @@ class ManagerTest extends TestCase
                         '20120116183504' => ['version' => '20120116183504', 'migration_name' => '', 'breakpoint' => 1],
                     ],
                     '20120115000000',
-                    'Breakpoint reached. Further rollbacks inhibited.'
+                    'Breakpoint reached. Further rollbacks inhibited.',
                 ],
             'Rollback to date of the oldest migration - breakpoint set on last migration' =>
                 [
@@ -2071,7 +2084,7 @@ class ManagerTest extends TestCase
                         '20120116183504' => ['version' => '20120116183504', 'migration_name' => '', 'breakpoint' => 1],
                     ],
                     '20120111235330',
-                    'Breakpoint reached. Further rollbacks inhibited.'
+                    'Breakpoint reached. Further rollbacks inhibited.',
                 ],
             'Rollback to date before all the migrations - breakpoint set on last migration' =>
                 [
@@ -2080,7 +2093,7 @@ class ManagerTest extends TestCase
                         '20120116183504' => ['version' => '20120116183504', 'migration_name' => '', 'breakpoint' => 1],
                     ],
                     '20110115000000',
-                    'Breakpoint reached. Further rollbacks inhibited.'
+                    'Breakpoint reached. Further rollbacks inhibited.',
                 ],
 
             // Breakpoint set on all migrations
@@ -2092,7 +2105,7 @@ class ManagerTest extends TestCase
                         '20120116183504' => ['version' => '20120116183504', 'migration_name' => '', 'breakpoint' => 1],
                     ],
                     '20130118000000',
-                    null
+                    null,
                 ],
             'Rollback to date of the most recent migration - breakpoint set on all migrations' =>
                 [
@@ -2101,7 +2114,7 @@ class ManagerTest extends TestCase
                         '20120116183504' => ['version' => '20120116183504', 'migration_name' => '', 'breakpoint' => 1],
                     ],
                     '20120116183504',
-                    null
+                    null,
                 ],
             'Rollback to date between 2 migrations - breakpoint set on all migrations' =>
                 [
@@ -2110,7 +2123,7 @@ class ManagerTest extends TestCase
                         '20120116183504' => ['version' => '20120116183504', 'migration_name' => '', 'breakpoint' => 1],
                     ],
                     '20120115000000',
-                    'Breakpoint reached. Further rollbacks inhibited.'
+                    'Breakpoint reached. Further rollbacks inhibited.',
                 ],
             'Rollback to date of the oldest migration - breakpoint set on all migrations' =>
                 [
@@ -2119,7 +2132,7 @@ class ManagerTest extends TestCase
                         '20120116183504' => ['version' => '20120116183504', 'migration_name' => '', 'breakpoint' => 1],
                     ],
                     '20120111235330',
-                    'Breakpoint reached. Further rollbacks inhibited.'
+                    'Breakpoint reached. Further rollbacks inhibited.',
                 ],
             'Rollback to date before all the migrations - breakpoint set on all migrations' =>
                 [
@@ -2128,7 +2141,7 @@ class ManagerTest extends TestCase
                         '20120116183504' => ['version' => '20120116183504', 'migration_name' => '', 'breakpoint' => 1],
                     ],
                     '20110115000000',
-                    'Breakpoint reached. Further rollbacks inhibited.'
+                    'Breakpoint reached. Further rollbacks inhibited.',
                 ],
         ];
     }
@@ -2151,7 +2164,7 @@ class ManagerTest extends TestCase
                         '20160116183504' => ['version' => '20160116183504', 'migration_name' => '', 'breakpoint' => 0],
                     ],
                     '20160118000000',
-                    null
+                    null,
                 ],
             'Rollback to date of the most recent migration - no breakpoints set' =>
                 [
@@ -2160,7 +2173,7 @@ class ManagerTest extends TestCase
                         '20160116183504' => ['version' => '20160116183504', 'migration_name' => '', 'breakpoint' => 0],
                     ],
                     '20160116183504',
-                    null
+                    null,
                 ],
             'Rollback to date between 2 migrations - no breakpoints set' =>
                 [
@@ -2169,7 +2182,7 @@ class ManagerTest extends TestCase
                         '20160116183504' => ['version' => '20160116183504', 'migration_name' => '', 'breakpoint' => 0],
                     ],
                     '20160115',
-                    '== 20160116183504 Foo\Bar\TestMigration2: reverted'
+                    '== 20160116183504 Foo\Bar\TestMigration2: reverted',
                 ],
             'Rollback to date of the oldest migration - no breakpoints set' =>
                 [
@@ -2178,7 +2191,7 @@ class ManagerTest extends TestCase
                         '20160116183504' => ['version' => '20160116183504', 'migration_name' => '', 'breakpoint' => 0],
                     ],
                     '20160111235330',
-                    '== 20160116183504 Foo\Bar\TestMigration2: reverted'
+                    '== 20160116183504 Foo\Bar\TestMigration2: reverted',
                 ],
             'Rollback to date before all the migrations - no breakpoints set' =>
                 [
@@ -2187,7 +2200,7 @@ class ManagerTest extends TestCase
                         '20160116183504' => ['version' => '20160116183504', 'migration_name' => '', 'breakpoint' => 0],
                     ],
                     '20110115',
-                    ['== 20160116183504 Foo\Bar\TestMigration2: reverted', '== 20160111235330 Foo\Bar\TestMigration: reverted']
+                    ['== 20160116183504 Foo\Bar\TestMigration2: reverted', '== 20160111235330 Foo\Bar\TestMigration: reverted'],
                 ],
 
             // Breakpoint set on first migration
@@ -2199,7 +2212,7 @@ class ManagerTest extends TestCase
                         '20160116183504' => ['version' => '20160116183504', 'migration_name' => '', 'breakpoint' => 0],
                     ],
                     '20160118000000',
-                    null
+                    null,
                 ],
             'Rollback to date of the most recent migration - breakpoint set on first migration' =>
                 [
@@ -2208,7 +2221,7 @@ class ManagerTest extends TestCase
                         '20160116183504' => ['version' => '20160116183504', 'migration_name' => '', 'breakpoint' => 0],
                     ],
                     '20160116183504',
-                    null
+                    null,
                 ],
             'Rollback to date between 2 migrations - breakpoint set on first migration' =>
                 [
@@ -2217,7 +2230,7 @@ class ManagerTest extends TestCase
                         '20160116183504' => ['version' => '20160116183504', 'migration_name' => '', 'breakpoint' => 0],
                     ],
                     '20160115',
-                    '== 20160116183504 Foo\Bar\TestMigration2: reverted'
+                    '== 20160116183504 Foo\Bar\TestMigration2: reverted',
                 ],
             'Rollback to date of the oldest migration - breakpoint set on first migration' =>
                 [
@@ -2226,7 +2239,7 @@ class ManagerTest extends TestCase
                         '20160116183504' => ['version' => '20160116183504', 'migration_name' => '', 'breakpoint' => 0],
                     ],
                     '20160111235330',
-                    '== 20160116183504 Foo\Bar\TestMigration2: reverted'
+                    '== 20160116183504 Foo\Bar\TestMigration2: reverted',
                 ],
             'Rollback to date before all the migrations - breakpoint set on first migration' =>
                 [
@@ -2235,7 +2248,7 @@ class ManagerTest extends TestCase
                         '20160116183504' => ['version' => '20160116183504', 'migration_name' => '', 'breakpoint' => 0],
                     ],
                     '20110115',
-                    'Breakpoint reached. Further rollbacks inhibited.'
+                    'Breakpoint reached. Further rollbacks inhibited.',
                 ],
 
             // Breakpoint set on last migration
@@ -2247,7 +2260,7 @@ class ManagerTest extends TestCase
                         '20160116183504' => ['version' => '20160116183504', 'migration_name' => '', 'breakpoint' => 1],
                     ],
                     '20160118000000',
-                    null
+                    null,
                 ],
             'Rollback to date of the most recent migration - breakpoint set on last migration' =>
                 [
@@ -2256,7 +2269,7 @@ class ManagerTest extends TestCase
                         '20160116183504' => ['version' => '20160116183504', 'migration_name' => '', 'breakpoint' => 1],
                     ],
                     '20160116183504',
-                    null
+                    null,
                 ],
             'Rollback to date between 2 migrations - breakpoint set on last migration' =>
                 [
@@ -2265,7 +2278,7 @@ class ManagerTest extends TestCase
                         '20160116183504' => ['version' => '20160116183504', 'migration_name' => '', 'breakpoint' => 1],
                     ],
                     '20160115000000',
-                    'Breakpoint reached. Further rollbacks inhibited.'
+                    'Breakpoint reached. Further rollbacks inhibited.',
                 ],
             'Rollback to date of the oldest migration - breakpoint set on last migration' =>
                 [
@@ -2274,7 +2287,7 @@ class ManagerTest extends TestCase
                         '20160116183504' => ['version' => '20160116183504', 'migration_name' => '', 'breakpoint' => 1],
                     ],
                     '20160111235330',
-                    'Breakpoint reached. Further rollbacks inhibited.'
+                    'Breakpoint reached. Further rollbacks inhibited.',
                 ],
             'Rollback to date before all the migrations - breakpoint set on last migration' =>
                 [
@@ -2283,7 +2296,7 @@ class ManagerTest extends TestCase
                         '20160116183504' => ['version' => '20160116183504', 'migration_name' => '', 'breakpoint' => 1],
                     ],
                     '20110115000000',
-                    'Breakpoint reached. Further rollbacks inhibited.'
+                    'Breakpoint reached. Further rollbacks inhibited.',
                 ],
 
             // Breakpoint set on all migrations
@@ -2295,7 +2308,7 @@ class ManagerTest extends TestCase
                         '20160116183504' => ['version' => '20160116183504', 'migration_name' => '', 'breakpoint' => 1],
                     ],
                     '20160118000000',
-                    null
+                    null,
                 ],
             'Rollback to date of the most recent migration - breakpoint set on all migrations' =>
                 [
@@ -2304,7 +2317,7 @@ class ManagerTest extends TestCase
                         '20160116183504' => ['version' => '20160116183504', 'migration_name' => '', 'breakpoint' => 1],
                     ],
                     '20160116183504',
-                    null
+                    null,
                 ],
             'Rollback to date between 2 migrations - breakpoint set on all migrations' =>
                 [
@@ -2313,7 +2326,7 @@ class ManagerTest extends TestCase
                         '20160116183504' => ['version' => '20160116183504', 'migration_name' => '', 'breakpoint' => 1],
                     ],
                     '20160115000000',
-                    'Breakpoint reached. Further rollbacks inhibited.'
+                    'Breakpoint reached. Further rollbacks inhibited.',
                 ],
             'Rollback to date of the oldest migration - breakpoint set on all migrations' =>
                 [
@@ -2322,7 +2335,7 @@ class ManagerTest extends TestCase
                         '20160116183504' => ['version' => '20160116183504', 'migration_name' => '', 'breakpoint' => 1],
                     ],
                     '20160111235330',
-                    'Breakpoint reached. Further rollbacks inhibited.'
+                    'Breakpoint reached. Further rollbacks inhibited.',
                 ],
             'Rollback to date before all the migrations - breakpoint set on all migrations' =>
                 [
@@ -2331,7 +2344,7 @@ class ManagerTest extends TestCase
                         '20160116183504' => ['version' => '20160116183504', 'migration_name' => '', 'breakpoint' => 1],
                     ],
                     '20110115000000',
-                    'Breakpoint reached. Further rollbacks inhibited.'
+                    'Breakpoint reached. Further rollbacks inhibited.',
                 ],
         ];
     }
@@ -2358,7 +2371,7 @@ class ManagerTest extends TestCase
                         '20160116183504' => ['version' => '20160116183504', 'migration_name' => '', 'breakpoint' => 0],
                     ],
                     '20160118000000',
-                    null
+                    null,
                 ],
             'Rollback to date of the most recent migration - no breakpoints set' =>
                 [
@@ -2371,7 +2384,7 @@ class ManagerTest extends TestCase
                         '20160116183504' => ['version' => '20160116183504', 'migration_name' => '', 'breakpoint' => 0],
                     ],
                     '20160116183504',
-                    null
+                    null,
                 ],
             'Rollback to date between 2 migrations - no breakpoints set' =>
                 [
@@ -2384,7 +2397,7 @@ class ManagerTest extends TestCase
                         '20160116183504' => ['version' => '20160116183504', 'migration_name' => '', 'breakpoint' => 0],
                     ],
                     '20160115',
-                    '== 20160116183504 Foo\Bar\TestMigration2: reverted'
+                    '== 20160116183504 Foo\Bar\TestMigration2: reverted',
                 ],
             'Rollback to date of the oldest migration - no breakpoints set' =>
                 [
@@ -2397,7 +2410,7 @@ class ManagerTest extends TestCase
                         '20160116183504' => ['version' => '20160116183504', 'migration_name' => '', 'breakpoint' => 0],
                     ],
                     '20160111235330',
-                    '== 20160116183504 Foo\Bar\TestMigration2: reverted'
+                    '== 20160116183504 Foo\Bar\TestMigration2: reverted',
                 ],
             'Rollback to date before all the migrations - no breakpoints set' =>
                 [
@@ -2417,7 +2430,7 @@ class ManagerTest extends TestCase
                         '== 20150111235330 Baz\TestMigration: reverted',
                         '== 20120116183504 TestMigration2: reverted',
                         '== 20120111235330 TestMigration: reverted',
-                    ]
+                    ],
                 ],
 
             // Breakpoint set on first migration
@@ -2433,7 +2446,7 @@ class ManagerTest extends TestCase
                         '20160116183504' => ['version' => '20160116183504', 'migration_name' => '', 'breakpoint' => 0],
                     ],
                     '20160118000000',
-                    null
+                    null,
                 ],
             'Rollback to date of the most recent migration - breakpoint set on first migration' =>
                 [
@@ -2446,7 +2459,7 @@ class ManagerTest extends TestCase
                         '20160116183504' => ['version' => '20160116183504', 'migration_name' => '', 'breakpoint' => 0],
                     ],
                     '20160116183504',
-                    null
+                    null,
                 ],
             'Rollback to date between 2 migrations - breakpoint set on penultimate migration' =>
                 [
@@ -2459,7 +2472,7 @@ class ManagerTest extends TestCase
                         '20160116183504' => ['version' => '20160116183504', 'migration_name' => '', 'breakpoint' => 0],
                     ],
                     '20160115',
-                    '== 20160116183504 Foo\Bar\TestMigration2: reverted'
+                    '== 20160116183504 Foo\Bar\TestMigration2: reverted',
                 ],
             'Rollback to date of the oldest migration - breakpoint set on penultimate migration' =>
                 [
@@ -2472,7 +2485,7 @@ class ManagerTest extends TestCase
                         '20160116183504' => ['version' => '20160116183504', 'migration_name' => '', 'breakpoint' => 0],
                     ],
                     '20160111235330',
-                    '== 20160116183504 Foo\Bar\TestMigration2: reverted'
+                    '== 20160116183504 Foo\Bar\TestMigration2: reverted',
                 ],
             'Rollback to date before all the migrations - breakpoint set on first migration' =>
                 [
@@ -2485,7 +2498,7 @@ class ManagerTest extends TestCase
                         '20160116183504' => ['version' => '20160116183504', 'migration_name' => '', 'breakpoint' => 0],
                     ],
                     '20110115',
-                    'Breakpoint reached. Further rollbacks inhibited.'
+                    'Breakpoint reached. Further rollbacks inhibited.',
                 ],
 
             // Breakpoint set on last migration
@@ -2501,7 +2514,7 @@ class ManagerTest extends TestCase
                         '20160116183504' => ['version' => '20160116183504', 'migration_name' => '', 'breakpoint' => 1],
                     ],
                     '20160118000000',
-                    null
+                    null,
                 ],
             'Rollback to date of the most recent migration - breakpoint set on last migration' =>
                 [
@@ -2514,7 +2527,7 @@ class ManagerTest extends TestCase
                         '20160116183504' => ['version' => '20160116183504', 'migration_name' => '', 'breakpoint' => 1],
                     ],
                     '20160116183504',
-                    null
+                    null,
                 ],
             'Rollback to date between 2 migrations - breakpoint set on last migration' =>
                 [
@@ -2527,7 +2540,7 @@ class ManagerTest extends TestCase
                         '20160116183504' => ['version' => '20160116183504', 'migration_name' => '', 'breakpoint' => 1],
                     ],
                     '20160115000000',
-                    'Breakpoint reached. Further rollbacks inhibited.'
+                    'Breakpoint reached. Further rollbacks inhibited.',
                 ],
             'Rollback to date of the oldest migration - breakpoint set on last migration' =>
                 [
@@ -2540,7 +2553,7 @@ class ManagerTest extends TestCase
                         '20160116183504' => ['version' => '20160116183504', 'migration_name' => '', 'breakpoint' => 1],
                     ],
                     '20160111235330',
-                    'Breakpoint reached. Further rollbacks inhibited.'
+                    'Breakpoint reached. Further rollbacks inhibited.',
                 ],
             'Rollback to date before all the migrations - breakpoint set on last migration' =>
                 [
@@ -2553,7 +2566,7 @@ class ManagerTest extends TestCase
                         '20160116183504' => ['version' => '20160116183504', 'migration_name' => '', 'breakpoint' => 1],
                     ],
                     '20110115000000',
-                    'Breakpoint reached. Further rollbacks inhibited.'
+                    'Breakpoint reached. Further rollbacks inhibited.',
                 ],
 
             // Breakpoint set on all migrations
@@ -2569,7 +2582,7 @@ class ManagerTest extends TestCase
                         '20160116183504' => ['version' => '20160116183504', 'migration_name' => '', 'breakpoint' => 1],
                     ],
                     '20160118000000',
-                    null
+                    null,
                 ],
             'Rollback to date of the most recent migration - breakpoint set on all migrations' =>
                 [
@@ -2582,7 +2595,7 @@ class ManagerTest extends TestCase
                         '20160116183504' => ['version' => '20160116183504', 'migration_name' => '', 'breakpoint' => 1],
                     ],
                     '20160116183504',
-                    null
+                    null,
                 ],
             'Rollback to date between 2 migrations - breakpoint set on all migrations' =>
                 [
@@ -2595,7 +2608,7 @@ class ManagerTest extends TestCase
                         '20160116183504' => ['version' => '20160116183504', 'migration_name' => '', 'breakpoint' => 1],
                     ],
                     '20160115000000',
-                    'Breakpoint reached. Further rollbacks inhibited.'
+                    'Breakpoint reached. Further rollbacks inhibited.',
                 ],
             'Rollback to date of the oldest migration - breakpoint set on all migrations' =>
                 [
@@ -2608,7 +2621,7 @@ class ManagerTest extends TestCase
                         '20160116183504' => ['version' => '20160116183504', 'migration_name' => '', 'breakpoint' => 1],
                     ],
                     '20160111235330',
-                    'Breakpoint reached. Further rollbacks inhibited.'
+                    'Breakpoint reached. Further rollbacks inhibited.',
                 ],
             'Rollback to date before all the migrations - breakpoint set on all migrations' =>
                 [
@@ -2621,7 +2634,7 @@ class ManagerTest extends TestCase
                         '20160116183504' => ['version' => '20160116183504', 'migration_name' => '', 'breakpoint' => 1],
                     ],
                     '20110115000000',
-                    'Breakpoint reached. Further rollbacks inhibited.'
+                    'Breakpoint reached. Further rollbacks inhibited.',
                 ],
         ];
     }
@@ -2644,7 +2657,7 @@ class ManagerTest extends TestCase
                         '20120111235330' => ['version' => '20120111235330', 'start_time' => '2012-01-20 23:53:30', 'breakpoint' => 0],
                     ],
                     '20131212000000',
-                    null
+                    null,
                 ],
             'Rollback to date earlier than all migration start times when they were created in a different order than they were executed - no breakpoints set' =>
                 [
@@ -2653,7 +2666,7 @@ class ManagerTest extends TestCase
                         '20120111235330' => ['version' => '20120111235330', 'start_time' => '2012-01-20 23:53:30', 'breakpoint' => 0],
                     ],
                     '20111212000000',
-                    ['== 20120111235330 TestMigration: reverted', '== 20120116183504 TestMigration2: reverted']
+                    ['== 20120111235330 TestMigration: reverted', '== 20120116183504 TestMigration2: reverted'],
                 ],
             'Rollback to start time of first created version which was the last to be executed - no breakpoints set' =>
                 [
@@ -2662,7 +2675,7 @@ class ManagerTest extends TestCase
                         '20120111235330' => ['version' => '20120111235330', 'start_time' => '2012-01-20 23:53:30', 'breakpoint' => 0],
                     ],
                     '20120120235330',
-                    null
+                    null,
                 ],
             'Rollback to start time of second created version which was the first to be executed - no breakpoints set' =>
                 [
@@ -2671,7 +2684,7 @@ class ManagerTest extends TestCase
                         '20120111235330' => ['version' => '20120111235330', 'start_time' => '2012-01-20 23:53:30', 'breakpoint' => 0],
                     ],
                     '20120117183504',
-                    '== 20120111235330 TestMigration: reverted'
+                    '== 20120111235330 TestMigration: reverted',
                 ],
             'Rollback to date between the 2 migrations when they were created in a different order than they were executed - no breakpoints set' =>
                 [
@@ -2680,7 +2693,7 @@ class ManagerTest extends TestCase
                         '20120111235330' => ['version' => '20120111235330', 'start_time' => '2012-01-20 23:53:30', 'breakpoint' => 0],
                     ],
                     '20120118000000',
-                    '== 20120111235330 TestMigration: reverted'
+                    '== 20120111235330 TestMigration: reverted',
                 ],
             'Rollback the last executed migration when the migrations were created in a different order than they were executed - no breakpoints set' =>
                 [
@@ -2689,7 +2702,7 @@ class ManagerTest extends TestCase
                         '20120111235330' => ['version' => '20120111235330', 'start_time' => '2012-01-20 23:53:30', 'breakpoint' => 0],
                     ],
                     null,
-                    '== 20120111235330 TestMigration: reverted'
+                    '== 20120111235330 TestMigration: reverted',
                 ],
 
             // Breakpoint set on first/last created/executed migration
@@ -2701,7 +2714,7 @@ class ManagerTest extends TestCase
                         '20120111235330' => ['version' => '20120111235330', 'start_time' => '2012-01-20 23:53:30', 'breakpoint' => 1],
                     ],
                     '20131212000000',
-                    null
+                    null,
                 ],
             'Rollback to date later than all migration start times when they were created in a different order than they were executed - breakpoints set on first executed (and last created) migration' =>
                 [
@@ -2710,7 +2723,7 @@ class ManagerTest extends TestCase
                         '20120111235330' => ['version' => '20120111235330', 'start_time' => '2012-01-20 23:53:30', 'breakpoint' => 0],
                     ],
                     '20131212000000',
-                    null
+                    null,
                 ],
             'Rollback to date earlier than all migration start times when they were created in a different order than they were executed - breakpoints set on first created (and last executed) migration' =>
                 [
@@ -2719,7 +2732,7 @@ class ManagerTest extends TestCase
                         '20120111235330' => ['version' => '20120111235330', 'start_time' => '2012-01-20 23:53:30', 'breakpoint' => 1],
                     ],
                     '20111212000000',
-                    'Breakpoint reached. Further rollbacks inhibited.'
+                    'Breakpoint reached. Further rollbacks inhibited.',
                 ],
             'Rollback to date earlier than all migration start times when they were created in a different order than they were executed - breakpoints set on first executed (and last created) migration' =>
                 [
@@ -2728,7 +2741,7 @@ class ManagerTest extends TestCase
                         '20120111235330' => ['version' => '20120111235330', 'start_time' => '2012-01-20 23:53:30', 'breakpoint' => 0],
                     ],
                     '20111212000000',
-                    ['== 20120111235330 TestMigration: reverted', 'Breakpoint reached. Further rollbacks inhibited.']
+                    ['== 20120111235330 TestMigration: reverted', 'Breakpoint reached. Further rollbacks inhibited.'],
                 ],
             'Rollback to start time of first created version which was the last to be executed - breakpoints set on first created (and last executed) migration' =>
                 [
@@ -2737,7 +2750,7 @@ class ManagerTest extends TestCase
                         '20120111235330' => ['version' => '20120111235330', 'start_time' => '2012-01-20 23:53:30', 'breakpoint' => 1],
                     ],
                     '20120120235330',
-                    null
+                    null,
                 ],
             'Rollback to start time of first created version which was the last to be executed - breakpoints set on first executed (and last created) migration' =>
                 [
@@ -2746,7 +2759,7 @@ class ManagerTest extends TestCase
                         '20120111235330' => ['version' => '20120111235330', 'start_time' => '2012-01-20 23:53:30', 'breakpoint' => 0],
                     ],
                     '20120120235330',
-                    null
+                    null,
                 ],
             'Rollback to start time of second created version which was the first to be executed - breakpoints set on first created (and last executed) migration' =>
                 [
@@ -2755,7 +2768,7 @@ class ManagerTest extends TestCase
                         '20120111235330' => ['version' => '20120111235330', 'start_time' => '2012-01-20 23:53:30', 'breakpoint' => 1],
                     ],
                     '20120117183504',
-                    'Breakpoint reached. Further rollbacks inhibited.'
+                    'Breakpoint reached. Further rollbacks inhibited.',
                 ],
             'Rollback to start time of second created version which was the first to be executed - breakpoints set on first executed (and last created) migration' =>
                 [
@@ -2764,7 +2777,7 @@ class ManagerTest extends TestCase
                         '20120111235330' => ['version' => '20120111235330', 'start_time' => '2012-01-20 23:53:30', 'breakpoint' => 0],
                     ],
                     '20120117183504',
-                    '== 20120111235330 TestMigration: reverted'
+                    '== 20120111235330 TestMigration: reverted',
                 ],
             'Rollback to date between the 2 migrations when they were created in a different order than they were executed - breakpoints set on first created (and last executed) migration' =>
                 [
@@ -2773,7 +2786,7 @@ class ManagerTest extends TestCase
                         '20120111235330' => ['version' => '20120111235330', 'start_time' => '2012-01-20 23:53:30', 'breakpoint' => 1],
                     ],
                     '20120118000000',
-                    'Breakpoint reached. Further rollbacks inhibited.'
+                    'Breakpoint reached. Further rollbacks inhibited.',
                 ],
             'Rollback to date between the 2 migrations when they were created in a different order than they were executed - breakpoints set on first executed (and last created) migration' =>
                 [
@@ -2782,7 +2795,7 @@ class ManagerTest extends TestCase
                         '20120111235330' => ['version' => '20120111235330', 'start_time' => '2012-01-20 23:53:30', 'breakpoint' => 0],
                     ],
                     '20120118000000',
-                    '== 20120111235330 TestMigration: reverted'
+                    '== 20120111235330 TestMigration: reverted',
                 ],
             'Rollback the last executed migration when the migrations were created in a different order than they were executed - breakpoints set on first created (and last executed) migration' =>
                 [
@@ -2791,7 +2804,7 @@ class ManagerTest extends TestCase
                         '20120111235330' => ['version' => '20120111235330', 'start_time' => '2012-01-20 23:53:30', 'breakpoint' => 1],
                     ],
                     null,
-                    'Breakpoint reached. Further rollbacks inhibited.'
+                    'Breakpoint reached. Further rollbacks inhibited.',
                 ],
             'Rollback the last executed migration when the migrations were created in a different order than they were executed - breakpoints set on first executed (and last created) migration' =>
                 [
@@ -2800,7 +2813,7 @@ class ManagerTest extends TestCase
                         '20120111235330' => ['version' => '20120111235330', 'start_time' => '2012-01-20 23:53:30', 'breakpoint' => 0],
                     ],
                     null,
-                    '== 20120111235330 TestMigration: reverted'
+                    '== 20120111235330 TestMigration: reverted',
                 ],
 
             // Breakpoint set on all migration
@@ -2812,7 +2825,7 @@ class ManagerTest extends TestCase
                         '20120111235330' => ['version' => '20120111235330', 'start_time' => '2012-01-20 23:53:30', 'breakpoint' => 1],
                     ],
                     '20131212000000',
-                    null
+                    null,
                 ],
             'Rollback to date earlier than all migration start times when they were created in a different order than they were executed - breakpoints set on all migrations' =>
                 [
@@ -2821,7 +2834,7 @@ class ManagerTest extends TestCase
                         '20120111235330' => ['version' => '20120111235330', 'start_time' => '2012-01-20 23:53:30', 'breakpoint' => 1],
                     ],
                     '20111212000000',
-                    'Breakpoint reached. Further rollbacks inhibited.'
+                    'Breakpoint reached. Further rollbacks inhibited.',
                 ],
             'Rollback to start time of first created version which was the last to be executed - breakpoints set on all migrations' =>
                 [
@@ -2830,7 +2843,7 @@ class ManagerTest extends TestCase
                         '20120111235330' => ['version' => '20120111235330', 'start_time' => '2012-01-20 23:53:30', 'breakpoint' => 1],
                     ],
                     '20120120235330',
-                    null
+                    null,
                 ],
             'Rollback to start time of second created version which was the first to be executed - breakpoints set on all migrations' =>
                 [
@@ -2839,7 +2852,7 @@ class ManagerTest extends TestCase
                         '20120111235330' => ['version' => '20120111235330', 'start_time' => '2012-01-20 23:53:30', 'breakpoint' => 1],
                     ],
                     '20120117183504',
-                    'Breakpoint reached. Further rollbacks inhibited.'
+                    'Breakpoint reached. Further rollbacks inhibited.',
                 ],
             'Rollback to date between the 2 migrations when they were created in a different order than they were executed - breakpoints set on all migrations' =>
                 [
@@ -2848,7 +2861,7 @@ class ManagerTest extends TestCase
                         '20120111235330' => ['version' => '20120111235330', 'start_time' => '2012-01-20 23:53:30', 'breakpoint' => 1],
                     ],
                     '20120118000000',
-                    'Breakpoint reached. Further rollbacks inhibited.'
+                    'Breakpoint reached. Further rollbacks inhibited.',
                 ],
             'Rollback the last executed migration when the migrations were created in a different order than they were executed - breakpoints set on all migrations' =>
                 [
@@ -2857,7 +2870,7 @@ class ManagerTest extends TestCase
                         '20120111235330' => ['version' => '20120111235330', 'start_time' => '2012-01-20 23:53:30', 'breakpoint' => 1],
                     ],
                     null,
-                    'Breakpoint reached. Further rollbacks inhibited.'
+                    'Breakpoint reached. Further rollbacks inhibited.',
                 ],
         ];
     }
@@ -2880,7 +2893,7 @@ class ManagerTest extends TestCase
                         '20160111235330' => ['version' => '20160111235330', 'start_time' => '2016-01-20 23:53:30', 'breakpoint' => 0],
                     ],
                     '20161212000000',
-                    null
+                    null,
                 ],
             'Rollback to date earlier than all migration start times when they were created in a different order than they were executed - no breakpoints set' =>
                 [
@@ -2889,7 +2902,7 @@ class ManagerTest extends TestCase
                         '20160111235330' => ['version' => '20160111235330', 'start_time' => '2016-01-20 23:53:30', 'breakpoint' => 0],
                     ],
                     '20111212000000',
-                    ['== 20160111235330 Foo\Bar\TestMigration: reverted', '== 20160116183504 Foo\Bar\TestMigration2: reverted']
+                    ['== 20160111235330 Foo\Bar\TestMigration: reverted', '== 20160116183504 Foo\Bar\TestMigration2: reverted'],
                 ],
             'Rollback to start time of first created version which was the last to be executed - no breakpoints set' =>
                 [
@@ -2898,7 +2911,7 @@ class ManagerTest extends TestCase
                         '20160111235330' => ['version' => '20160111235330', 'start_time' => '2016-01-20 23:53:30', 'breakpoint' => 0],
                     ],
                     '20160120235330',
-                    null
+                    null,
                 ],
             'Rollback to start time of second created version which was the first to be executed - no breakpoints set' =>
                 [
@@ -2907,7 +2920,7 @@ class ManagerTest extends TestCase
                         '20160111235330' => ['version' => '20160111235330', 'start_time' => '2016-01-20 23:53:30', 'breakpoint' => 0],
                     ],
                     '20160117183504',
-                    '== 20160111235330 Foo\Bar\TestMigration: reverted'
+                    '== 20160111235330 Foo\Bar\TestMigration: reverted',
                 ],
             'Rollback to date between the 2 migrations when they were created in a different order than they were executed - no breakpoints set' =>
                 [
@@ -2916,7 +2929,7 @@ class ManagerTest extends TestCase
                         '20160111235330' => ['version' => '20160111235330', 'start_time' => '2016-01-20 23:53:30', 'breakpoint' => 0],
                     ],
                     '20160118000000',
-                    '== 20160111235330 Foo\Bar\TestMigration: reverted'
+                    '== 20160111235330 Foo\Bar\TestMigration: reverted',
                 ],
             'Rollback the last executed migration when the migrations were created in a different order than they were executed - no breakpoints set' =>
                 [
@@ -2925,7 +2938,7 @@ class ManagerTest extends TestCase
                         '20160111235330' => ['version' => '20160111235330', 'start_time' => '2016-01-20 23:53:30', 'breakpoint' => 0],
                     ],
                     null,
-                    '== 20160111235330 Foo\Bar\TestMigration: reverted'
+                    '== 20160111235330 Foo\Bar\TestMigration: reverted',
                 ],
 
             // Breakpoint set on first/last created/executed migration
@@ -2937,7 +2950,7 @@ class ManagerTest extends TestCase
                         '20160111235330' => ['version' => '20160111235330', 'start_time' => '2016-01-20 23:53:30', 'breakpoint' => 1],
                     ],
                     '20161212000000',
-                    null
+                    null,
                 ],
             'Rollback to date later than all migration start times when they were created in a different order than they were executed - breakpoints set on first executed (and last created) migration' =>
                 [
@@ -2946,7 +2959,7 @@ class ManagerTest extends TestCase
                         '20160111235330' => ['version' => '20160111235330', 'start_time' => '2016-01-20 23:53:30', 'breakpoint' => 0],
                     ],
                     '20161212000000',
-                    null
+                    null,
                 ],
             'Rollback to date earlier than all migration start times when they were created in a different order than they were executed - breakpoints set on first created (and last executed) migration' =>
                 [
@@ -2955,7 +2968,7 @@ class ManagerTest extends TestCase
                         '20160111235330' => ['version' => '20160111235330', 'start_time' => '2016-01-20 23:53:30', 'breakpoint' => 1],
                     ],
                     '20111212000000',
-                    'Breakpoint reached. Further rollbacks inhibited.'
+                    'Breakpoint reached. Further rollbacks inhibited.',
                 ],
             'Rollback to date earlier than all migration start times when they were created in a different order than they were executed - breakpoints set on first executed (and last created) migration' =>
                 [
@@ -2964,7 +2977,7 @@ class ManagerTest extends TestCase
                         '20160111235330' => ['version' => '20160111235330', 'start_time' => '2016-01-20 23:53:30', 'breakpoint' => 0],
                     ],
                     '20111212000000',
-                    ['== 20160111235330 Foo\Bar\TestMigration: reverted', 'Breakpoint reached. Further rollbacks inhibited.']
+                    ['== 20160111235330 Foo\Bar\TestMigration: reverted', 'Breakpoint reached. Further rollbacks inhibited.'],
                 ],
             'Rollback to start time of first created version which was the last to be executed - breakpoints set on first created (and last executed) migration' =>
                 [
@@ -2973,7 +2986,7 @@ class ManagerTest extends TestCase
                         '20160111235330' => ['version' => '20160111235330', 'start_time' => '2016-01-20 23:53:30', 'breakpoint' => 1],
                     ],
                     '20160120235330',
-                    null
+                    null,
                 ],
             'Rollback to start time of first created version which was the last to be executed - breakpoints set on first executed (and last created) migration' =>
                 [
@@ -2982,7 +2995,7 @@ class ManagerTest extends TestCase
                         '20160111235330' => ['version' => '20160111235330', 'start_time' => '2016-01-20 23:53:30', 'breakpoint' => 0],
                     ],
                     '20160120235330',
-                    null
+                    null,
                 ],
             'Rollback to start time of second created version which was the first to be executed - breakpoints set on first created (and last executed) migration' =>
                 [
@@ -2991,7 +3004,7 @@ class ManagerTest extends TestCase
                         '20160111235330' => ['version' => '20160111235330', 'start_time' => '2016-01-20 23:53:30', 'breakpoint' => 1],
                     ],
                     '20160117183504',
-                    'Breakpoint reached. Further rollbacks inhibited.'
+                    'Breakpoint reached. Further rollbacks inhibited.',
                 ],
             'Rollback to start time of second created version which was the first to be executed - breakpoints set on first executed (and last created) migration' =>
                 [
@@ -3000,7 +3013,7 @@ class ManagerTest extends TestCase
                         '20160111235330' => ['version' => '20160111235330', 'start_time' => '2016-01-20 23:53:30', 'breakpoint' => 0],
                     ],
                     '20160117183504',
-                    '== 20160111235330 Foo\Bar\TestMigration: reverted'
+                    '== 20160111235330 Foo\Bar\TestMigration: reverted',
                 ],
             'Rollback to date between the 2 migrations when they were created in a different order than they were executed - breakpoints set on first created (and last executed) migration' =>
                 [
@@ -3009,7 +3022,7 @@ class ManagerTest extends TestCase
                         '20160111235330' => ['version' => '20160111235330', 'start_time' => '2016-01-20 23:53:30', 'breakpoint' => 1],
                     ],
                     '20160118000000',
-                    'Breakpoint reached. Further rollbacks inhibited.'
+                    'Breakpoint reached. Further rollbacks inhibited.',
                 ],
             'Rollback to date between the 2 migrations when they were created in a different order than they were executed - breakpoints set on first executed (and last created) migration' =>
                 [
@@ -3018,7 +3031,7 @@ class ManagerTest extends TestCase
                         '20160111235330' => ['version' => '20160111235330', 'start_time' => '2016-01-20 23:53:30', 'breakpoint' => 0],
                     ],
                     '20160118000000',
-                    '== 20160111235330 Foo\Bar\TestMigration: reverted'
+                    '== 20160111235330 Foo\Bar\TestMigration: reverted',
                 ],
             'Rollback the last executed migration when the migrations were created in a different order than they were executed - breakpoints set on first created (and last executed) migration' =>
                 [
@@ -3027,7 +3040,7 @@ class ManagerTest extends TestCase
                         '20160111235330' => ['version' => '20160111235330', 'start_time' => '2016-01-20 23:53:30', 'breakpoint' => 1],
                     ],
                     null,
-                    'Breakpoint reached. Further rollbacks inhibited.'
+                    'Breakpoint reached. Further rollbacks inhibited.',
                 ],
             'Rollback the last executed migration when the migrations were created in a different order than they were executed - breakpoints set on first executed (and last created) migration' =>
                 [
@@ -3036,7 +3049,7 @@ class ManagerTest extends TestCase
                         '20160111235330' => ['version' => '20160111235330', 'start_time' => '2016-01-20 23:53:30', 'breakpoint' => 0],
                     ],
                     null,
-                    '== 20160111235330 Foo\Bar\TestMigration: reverted'
+                    '== 20160111235330 Foo\Bar\TestMigration: reverted',
                 ],
 
             // Breakpoint set on all migration
@@ -3048,7 +3061,7 @@ class ManagerTest extends TestCase
                         '20160111235330' => ['version' => '20160111235330', 'start_time' => '2016-01-20 23:53:30', 'breakpoint' => 1],
                     ],
                     '20161212000000',
-                    null
+                    null,
                 ],
             'Rollback to date earlier than all migration start times when they were created in a different order than they were executed - breakpoints set on all migrations' =>
                 [
@@ -3057,7 +3070,7 @@ class ManagerTest extends TestCase
                         '20160111235330' => ['version' => '20160111235330', 'start_time' => '2016-01-20 23:53:30', 'breakpoint' => 1],
                     ],
                     '20111212000000',
-                    'Breakpoint reached. Further rollbacks inhibited.'
+                    'Breakpoint reached. Further rollbacks inhibited.',
                 ],
             'Rollback to start time of first created version which was the last to be executed - breakpoints set on all migrations' =>
                 [
@@ -3066,7 +3079,7 @@ class ManagerTest extends TestCase
                         '20160111235330' => ['version' => '20160111235330', 'start_time' => '2016-01-20 23:53:30', 'breakpoint' => 1],
                     ],
                     '20160120235330',
-                    null
+                    null,
                 ],
             'Rollback to start time of second created version which was the first to be executed - breakpoints set on all migrations' =>
                 [
@@ -3075,7 +3088,7 @@ class ManagerTest extends TestCase
                         '20160111235330' => ['version' => '20160111235330', 'start_time' => '2016-01-20 23:53:30', 'breakpoint' => 1],
                     ],
                     '20160117183504',
-                    'Breakpoint reached. Further rollbacks inhibited.'
+                    'Breakpoint reached. Further rollbacks inhibited.',
                 ],
             'Rollback to date between the 2 migrations when they were created in a different order than they were executed - breakpoints set on all migrations' =>
                 [
@@ -3084,7 +3097,7 @@ class ManagerTest extends TestCase
                         '20160111235330' => ['version' => '20160111235330', 'start_time' => '2016-01-20 23:53:30', 'breakpoint' => 1],
                     ],
                     '20160118000000',
-                    'Breakpoint reached. Further rollbacks inhibited.'
+                    'Breakpoint reached. Further rollbacks inhibited.',
                 ],
             'Rollback the last executed migration when the migrations were created in a different order than they were executed - breakpoints set on all migrations' =>
                 [
@@ -3093,7 +3106,7 @@ class ManagerTest extends TestCase
                         '20160111235330' => ['version' => '20160111235330', 'start_time' => '2016-01-20 23:53:30', 'breakpoint' => 1],
                     ],
                     null,
-                    'Breakpoint reached. Further rollbacks inhibited.'
+                    'Breakpoint reached. Further rollbacks inhibited.',
                 ],
         ];
     }
@@ -3116,7 +3129,7 @@ class ManagerTest extends TestCase
                         '20120116183504' => ['version' => '20120116183504', 'migration_name' => '', 'breakpoint' => 0],
                     ],
                     '20120111235330',
-                    '== 20120116183504 TestMigration2: reverted'
+                    '== 20120116183504 TestMigration2: reverted',
                 ],
             'Rollback to the latest version - no breakpoints set' =>
                 [
@@ -3125,7 +3138,7 @@ class ManagerTest extends TestCase
                         '20120116183504' => ['version' => '20120116183504', 'migration_name' => '', 'breakpoint' => 0],
                     ],
                     '20120116183504',
-                    null
+                    null,
                 ],
             'Rollback all versions (ie. rollback to version 0) - no breakpoints set' =>
                 [
@@ -3134,7 +3147,7 @@ class ManagerTest extends TestCase
                         '20120116183504' => ['version' => '20120116183504', 'migration_name' => '', 'breakpoint' => 0],
                     ],
                     '0',
-                    ['== 20120111235330 TestMigration: reverted', '== 20120116183504 TestMigration2: reverted']
+                    ['== 20120111235330 TestMigration: reverted', '== 20120116183504 TestMigration2: reverted'],
                 ],
             'Rollback last version - no breakpoints set' =>
                 [
@@ -3174,7 +3187,7 @@ class ManagerTest extends TestCase
                         '20120116183504' => ['version' => '20120116183504', 'migration_name' => '', 'breakpoint' => 0],
                     ],
                     '20120111235330',
-                    '== 20120116183504 TestMigration2: reverted'
+                    '== 20120116183504 TestMigration2: reverted',
                 ],
             'Rollback to the latest version - breakpoint set on first migration' =>
                 [
@@ -3183,7 +3196,7 @@ class ManagerTest extends TestCase
                         '20120116183504' => ['version' => '20120116183504', 'migration_name' => '', 'breakpoint' => 0],
                     ],
                     '20120116183504',
-                    null
+                    null,
                 ],
             'Rollback all versions (ie. rollback to version 0) - breakpoint set on first migration' =>
                 [
@@ -3192,7 +3205,7 @@ class ManagerTest extends TestCase
                         '20120116183504' => ['version' => '20120116183504', 'migration_name' => '', 'breakpoint' => 0],
                     ],
                     '0',
-                    '== 20120116183504 TestMigration2: reverted'
+                    '== 20120116183504 TestMigration2: reverted',
                 ],
             'Rollback last version - breakpoint set on first migration' =>
                 [
@@ -3232,7 +3245,7 @@ class ManagerTest extends TestCase
                         '20120116183504' => ['version' => '20120116183504', 'migration_name' => '', 'breakpoint' => 1],
                     ],
                     '20120111235330',
-                    'Breakpoint reached. Further rollbacks inhibited.'
+                    'Breakpoint reached. Further rollbacks inhibited.',
                 ],
             'Rollback to the latest version - breakpoint set on last migration' =>
                 [
@@ -3241,7 +3254,7 @@ class ManagerTest extends TestCase
                         '20120116183504' => ['version' => '20120116183504', 'migration_name' => '', 'breakpoint' => 1],
                     ],
                     '20120116183504',
-                    null
+                    null,
                 ],
             'Rollback all versions (ie. rollback to version 0) - breakpoint set on last migration' =>
                 [
@@ -3250,7 +3263,7 @@ class ManagerTest extends TestCase
                         '20120116183504' => ['version' => '20120116183504', 'migration_name' => '', 'breakpoint' => 1],
                     ],
                     '0',
-                    'Breakpoint reached. Further rollbacks inhibited.'
+                    'Breakpoint reached. Further rollbacks inhibited.',
                 ],
             'Rollback last version - breakpoint set on last migration' =>
                 [
@@ -3259,7 +3272,7 @@ class ManagerTest extends TestCase
                         '20120116183504' => ['version' => '20120116183504', 'migration_name' => '', 'breakpoint' => 1],
                     ],
                     null,
-                    'Breakpoint reached. Further rollbacks inhibited.'
+                    'Breakpoint reached. Further rollbacks inhibited.',
                 ],
             'Rollback to non-existing version - breakpoint set on last migration' =>
                 [
@@ -3290,7 +3303,7 @@ class ManagerTest extends TestCase
                         '20120116183504' => ['version' => '20120116183504', 'migration_name' => '', 'breakpoint' => 1],
                     ],
                     '20120111235330',
-                    'Breakpoint reached. Further rollbacks inhibited.'
+                    'Breakpoint reached. Further rollbacks inhibited.',
                 ],
             'Rollback to the latest version - breakpoint set on last migration' =>
                 [
@@ -3299,7 +3312,7 @@ class ManagerTest extends TestCase
                         '20120116183504' => ['version' => '20120116183504', 'migration_name' => '', 'breakpoint' => 1],
                     ],
                     '20120116183504',
-                    null
+                    null,
                 ],
             'Rollback all versions (ie. rollback to version 0) - breakpoint set on last migration' =>
                 [
@@ -3308,7 +3321,7 @@ class ManagerTest extends TestCase
                         '20120116183504' => ['version' => '20120116183504', 'migration_name' => '', 'breakpoint' => 1],
                     ],
                     '0',
-                    'Breakpoint reached. Further rollbacks inhibited.'
+                    'Breakpoint reached. Further rollbacks inhibited.',
                 ],
             'Rollback last version - breakpoint set on last migration' =>
                 [
@@ -3317,7 +3330,7 @@ class ManagerTest extends TestCase
                         '20120116183504' => ['version' => '20120116183504', 'migration_name' => '', 'breakpoint' => 1],
                     ],
                     null,
-                    'Breakpoint reached. Further rollbacks inhibited.'
+                    'Breakpoint reached. Further rollbacks inhibited.',
                 ],
             'Rollback to non-existing version - breakpoint set on last migration' =>
                 [
@@ -3337,7 +3350,7 @@ class ManagerTest extends TestCase
                     ],
                     '20111225000000',
                     'Target version (20111225000000) not found',
-                ]
+                ],
         ];
     }
 
@@ -3359,7 +3372,7 @@ class ManagerTest extends TestCase
                         '20160116183504' => ['version' => '20160116183504', 'migration_name' => '', 'breakpoint' => 0],
                     ],
                     '20160111235330',
-                    '== 20160116183504 Foo\Bar\TestMigration2: reverted'
+                    '== 20160116183504 Foo\Bar\TestMigration2: reverted',
                 ],
             'Rollback to the latest version - no breakpoints set' =>
                 [
@@ -3368,7 +3381,7 @@ class ManagerTest extends TestCase
                         '20160116183504' => ['version' => '20160116183504', 'migration_name' => '', 'breakpoint' => 0],
                     ],
                     '20160116183504',
-                    null
+                    null,
                 ],
             'Rollback all versions (ie. rollback to version 0) - no breakpoints set' =>
                 [
@@ -3377,7 +3390,7 @@ class ManagerTest extends TestCase
                         '20160116183504' => ['version' => '20160116183504', 'migration_name' => '', 'breakpoint' => 0],
                     ],
                     '0',
-                    ['== 20160111235330 Foo\Bar\TestMigration: reverted', '== 20160116183504 Foo\Bar\TestMigration2: reverted']
+                    ['== 20160111235330 Foo\Bar\TestMigration: reverted', '== 20160116183504 Foo\Bar\TestMigration2: reverted'],
                 ],
             'Rollback last version - no breakpoints set' =>
                 [
@@ -3417,7 +3430,7 @@ class ManagerTest extends TestCase
                         '20160116183504' => ['version' => '20160116183504', 'migration_name' => '', 'breakpoint' => 0],
                     ],
                     '20160111235330',
-                    '== 20160116183504 Foo\Bar\TestMigration2: reverted'
+                    '== 20160116183504 Foo\Bar\TestMigration2: reverted',
                 ],
             'Rollback to the latest version - breakpoint set on first migration' =>
                 [
@@ -3426,7 +3439,7 @@ class ManagerTest extends TestCase
                         '20160116183504' => ['version' => '20160116183504', 'migration_name' => '', 'breakpoint' => 0],
                     ],
                     '20160116183504',
-                    null
+                    null,
                 ],
             'Rollback all versions (ie. rollback to version 0) - breakpoint set on first migration' =>
                 [
@@ -3435,7 +3448,7 @@ class ManagerTest extends TestCase
                         '20160116183504' => ['version' => '20160116183504', 'migration_name' => '', 'breakpoint' => 0],
                     ],
                     '0',
-                    '== 20160116183504 Foo\Bar\TestMigration2: reverted'
+                    '== 20160116183504 Foo\Bar\TestMigration2: reverted',
                 ],
             'Rollback last version - breakpoint set on first migration' =>
                 [
@@ -3475,7 +3488,7 @@ class ManagerTest extends TestCase
                         '20160116183504' => ['version' => '20160116183504', 'migration_name' => '', 'breakpoint' => 1],
                     ],
                     '20160111235330',
-                    'Breakpoint reached. Further rollbacks inhibited.'
+                    'Breakpoint reached. Further rollbacks inhibited.',
                 ],
             'Rollback to the latest version - breakpoint set on last migration' =>
                 [
@@ -3484,7 +3497,7 @@ class ManagerTest extends TestCase
                         '20160116183504' => ['version' => '20160116183504', 'migration_name' => '', 'breakpoint' => 1],
                     ],
                     '20160116183504',
-                    null
+                    null,
                 ],
             'Rollback all versions (ie. rollback to version 0) - breakpoint set on last migration' =>
                 [
@@ -3493,7 +3506,7 @@ class ManagerTest extends TestCase
                         '20160116183504' => ['version' => '20160116183504', 'migration_name' => '', 'breakpoint' => 1],
                     ],
                     '0',
-                    'Breakpoint reached. Further rollbacks inhibited.'
+                    'Breakpoint reached. Further rollbacks inhibited.',
                 ],
             'Rollback last version - breakpoint set on last migration' =>
                 [
@@ -3502,7 +3515,7 @@ class ManagerTest extends TestCase
                         '20160116183504' => ['version' => '20160116183504', 'migration_name' => '', 'breakpoint' => 1],
                     ],
                     null,
-                    'Breakpoint reached. Further rollbacks inhibited.'
+                    'Breakpoint reached. Further rollbacks inhibited.',
                 ],
             'Rollback to non-existing version - breakpoint set on last migration' =>
                 [
@@ -3533,7 +3546,7 @@ class ManagerTest extends TestCase
                         '20160116183504' => ['version' => '20160116183504', 'migration_name' => '', 'breakpoint' => 1],
                     ],
                     '20160111235330',
-                    'Breakpoint reached. Further rollbacks inhibited.'
+                    'Breakpoint reached. Further rollbacks inhibited.',
                 ],
             'Rollback to the latest version - breakpoint set on last migration ' =>
                 [
@@ -3542,7 +3555,7 @@ class ManagerTest extends TestCase
                         '20160116183504' => ['version' => '20160116183504', 'migration_name' => '', 'breakpoint' => 1],
                     ],
                     '20160116183504',
-                    null
+                    null,
                 ],
             'Rollback all versions (ie. rollback to version 0) - breakpoint set on last migration ' =>
                 [
@@ -3551,7 +3564,7 @@ class ManagerTest extends TestCase
                         '20160116183504' => ['version' => '20160116183504', 'migration_name' => '', 'breakpoint' => 1],
                     ],
                     '0',
-                    'Breakpoint reached. Further rollbacks inhibited.'
+                    'Breakpoint reached. Further rollbacks inhibited.',
                 ],
             'Rollback last version - breakpoint set on last migration ' =>
                 [
@@ -3560,7 +3573,7 @@ class ManagerTest extends TestCase
                         '20160116183504' => ['version' => '20160116183504', 'migration_name' => '', 'breakpoint' => 1],
                     ],
                     null,
-                    'Breakpoint reached. Further rollbacks inhibited.'
+                    'Breakpoint reached. Further rollbacks inhibited.',
                 ],
             'Rollback to non-existing version - breakpoint set on last migration ' =>
                 [
@@ -3580,7 +3593,7 @@ class ManagerTest extends TestCase
                     ],
                     '20111225000000',
                     'Target version (20111225000000) not found',
-                ]
+                ],
         ];
     }
 
@@ -3606,7 +3619,7 @@ class ManagerTest extends TestCase
                         '20160116183504' => ['version' => '20160116183504', 'migration_name' => '', 'breakpoint' => 0],
                     ],
                     '20160111235330',
-                    '== 20160116183504 Foo\Bar\TestMigration2: reverted'
+                    '== 20160116183504 Foo\Bar\TestMigration2: reverted',
                 ],
             'Rollback to the latest version - no breakpoints set' =>
                 [
@@ -3619,7 +3632,7 @@ class ManagerTest extends TestCase
                         '20160116183504' => ['version' => '20160116183504', 'migration_name' => '', 'breakpoint' => 0],
                     ],
                     '20160116183504',
-                    null
+                    null,
                 ],
             'Rollback all versions (ie. rollback to version 0) - no breakpoints set' =>
                 [
@@ -3639,7 +3652,7 @@ class ManagerTest extends TestCase
                         '== 20150116183504 Baz\TestMigration2: reverted',
                         '== 20160111235330 Foo\Bar\TestMigration: reverted',
                         '== 20160116183504 Foo\Bar\TestMigration2: reverted',
-                    ]
+                    ],
                 ],
             'Rollback last version - no breakpoints set' =>
                 [
@@ -3701,7 +3714,7 @@ class ManagerTest extends TestCase
                         '== 20150116183504 Baz\TestMigration2: reverted',
                         '== 20160111235330 Foo\Bar\TestMigration: reverted',
                         '== 20160116183504 Foo\Bar\TestMigration2: reverted',
-                    ]
+                    ],
                 ],
 
             'Rollback to one of the versions - breakpoint set on penultimate migration' =>
@@ -3715,7 +3728,7 @@ class ManagerTest extends TestCase
                         '20160116183504' => ['version' => '20160116183504', 'migration_name' => '', 'breakpoint' => 0],
                     ],
                     '20160111235330',
-                    '== 20160116183504 Foo\Bar\TestMigration2: reverted'
+                    '== 20160116183504 Foo\Bar\TestMigration2: reverted',
                 ],
             'Rollback to the latest version - breakpoint set on penultimate migration' =>
                 [
@@ -3728,7 +3741,7 @@ class ManagerTest extends TestCase
                         '20160116183504' => ['version' => '20160116183504', 'migration_name' => '', 'breakpoint' => 0],
                     ],
                     '20160116183504',
-                    null
+                    null,
                 ],
             'Rollback all versions (ie. rollback to version 0) - breakpoint set on penultimate migration' =>
                 [
@@ -3741,7 +3754,7 @@ class ManagerTest extends TestCase
                         '20160116183504' => ['version' => '20160116183504', 'migration_name' => '', 'breakpoint' => 0],
                     ],
                     '0',
-                    '== 20160116183504 Foo\Bar\TestMigration2: reverted'
+                    '== 20160116183504 Foo\Bar\TestMigration2: reverted',
                 ],
             'Rollback last version - breakpoint set on penultimate migration' =>
                 [
@@ -3797,7 +3810,7 @@ class ManagerTest extends TestCase
                         '20160116183504' => ['version' => '20160116183504', 'migration_name' => '', 'breakpoint' => 1],
                     ],
                     '20160111235330',
-                    'Breakpoint reached. Further rollbacks inhibited.'
+                    'Breakpoint reached. Further rollbacks inhibited.',
                 ],
             'Rollback to the latest version - breakpoint set on last migration' =>
                 [
@@ -3810,7 +3823,7 @@ class ManagerTest extends TestCase
                         '20160116183504' => ['version' => '20160116183504', 'migration_name' => '', 'breakpoint' => 1],
                     ],
                     '20160116183504',
-                    null
+                    null,
                 ],
             'Rollback all versions (ie. rollback to version 0) - breakpoint set on last migration' =>
                 [
@@ -3823,7 +3836,7 @@ class ManagerTest extends TestCase
                         '20160116183504' => ['version' => '20160116183504', 'migration_name' => '', 'breakpoint' => 1],
                     ],
                     '0',
-                    'Breakpoint reached. Further rollbacks inhibited.'
+                    'Breakpoint reached. Further rollbacks inhibited.',
                 ],
             'Rollback last version - breakpoint set on last migration' =>
                 [
@@ -3836,7 +3849,7 @@ class ManagerTest extends TestCase
                         '20160116183504' => ['version' => '20160116183504', 'migration_name' => '', 'breakpoint' => 1],
                     ],
                     null,
-                    'Breakpoint reached. Further rollbacks inhibited.'
+                    'Breakpoint reached. Further rollbacks inhibited.',
                 ],
             'Rollback to non-existing version - breakpoint set on last migration' =>
                 [
@@ -3879,7 +3892,7 @@ class ManagerTest extends TestCase
                         '20160116183504' => ['version' => '20160116183504', 'migration_name' => '', 'breakpoint' => 1],
                     ],
                     '20160111235330',
-                    'Breakpoint reached. Further rollbacks inhibited.'
+                    'Breakpoint reached. Further rollbacks inhibited.',
                 ],
             'Rollback to the latest version - breakpoint set on last migration ' =>
                 [
@@ -3892,7 +3905,7 @@ class ManagerTest extends TestCase
                         '20160116183504' => ['version' => '20160116183504', 'migration_name' => '', 'breakpoint' => 1],
                     ],
                     '20160116183504',
-                    null
+                    null,
                 ],
             'Rollback all versions (ie. rollback to version 0) - breakpoint set on last migration ' =>
                 [
@@ -3905,7 +3918,7 @@ class ManagerTest extends TestCase
                         '20160116183504' => ['version' => '20160116183504', 'migration_name' => '', 'breakpoint' => 1],
                     ],
                     '0',
-                    'Breakpoint reached. Further rollbacks inhibited.'
+                    'Breakpoint reached. Further rollbacks inhibited.',
                 ],
             'Rollback last version - breakpoint set on last migration ' =>
                 [
@@ -3918,7 +3931,7 @@ class ManagerTest extends TestCase
                         '20160116183504' => ['version' => '20160116183504', 'migration_name' => '', 'breakpoint' => 1],
                     ],
                     null,
-                    'Breakpoint reached. Further rollbacks inhibited.'
+                    'Breakpoint reached. Further rollbacks inhibited.',
                 ],
             'Rollback to non-existing version - breakpoint set on last migration ' =>
                 [
@@ -3946,7 +3959,7 @@ class ManagerTest extends TestCase
                     ],
                     '20111225000000',
                     'Target version (20111225000000) not found',
-                ]
+                ],
         ];
     }
 
@@ -3963,7 +3976,7 @@ class ManagerTest extends TestCase
                         '20120116183504' => ['version' => '20120116183504', 'start_time' => '2012-01-17 18:35:04', 'end_time' => '2012-01-17 18:35:04', 'breakpoint' => 0, 'migration_name' => 'TestMigration2'],
                     ],
                     '20120111235330',
-                    '== 20120116183504 TestMigration2: reverted'
+                    '== 20120116183504 TestMigration2: reverted',
                 ],
             'Rollback to last created version which was also the last to be executed - no breakpoints set' =>
                 [
@@ -3972,7 +3985,7 @@ class ManagerTest extends TestCase
                         '20120116183504' => ['version' => '20120116183504', 'start_time' => '2012-01-17 18:35:04', 'end_time' => '2012-01-17 18:35:04', 'breakpoint' => 0, 'migration_name' => 'TestMigration2'],
                     ],
                     '20120116183504',
-                    'No migrations to rollback'
+                    'No migrations to rollback',
                 ],
             'Rollback all versions (ie. rollback to version 0) - no breakpoints set' =>
                 [
@@ -3981,7 +3994,7 @@ class ManagerTest extends TestCase
                         '20120116183504' => ['version' => '20120116183504', 'start_time' => '2012-01-17 18:35:04', 'end_time' => '2012-01-17 18:35:04', 'breakpoint' => 0, 'migration_name' => 'TestMigration2'],
                     ],
                     '0',
-                    ['== 20120111235330 TestMigration: reverted', '== 20120116183504 TestMigration2: reverted']
+                    ['== 20120111235330 TestMigration: reverted', '== 20120116183504 TestMigration2: reverted'],
                 ],
             'Rollback to second created version which was the first to be executed - no breakpoints set' =>
                 [
@@ -3990,7 +4003,7 @@ class ManagerTest extends TestCase
                         '20120111235330' => ['version' => '20120111235330', 'start_time' => '2012-01-12 23:53:30', 'end_time' => '2012-01-12 23:53:30', 'breakpoint' => 0, 'migration_name' => 'TestMigration2'],
                     ],
                     '20120116183504',
-                    '== 20120111235330 TestMigration: reverted'
+                    '== 20120111235330 TestMigration: reverted',
                 ],
             'Rollback to first created version which was the second to be executed - no breakpoints set' =>
                 [
@@ -3999,7 +4012,7 @@ class ManagerTest extends TestCase
                         '20120111235330' => ['version' => '20120111235330', 'start_time' => '2012-01-20 23:53:30', 'end_time' => '2012-01-20 23:53:30', 'breakpoint' => 0, 'migration_name' => 'TestMigration2'],
                     ],
                     '20120111235330',
-                    'No migrations to rollback'
+                    'No migrations to rollback',
                 ],
             'Rollback last executed version which was also the last created version - no breakpoints set' =>
                 [
@@ -4008,7 +4021,7 @@ class ManagerTest extends TestCase
                         '20120116183504' => ['version' => '20120116183504', 'start_time' => '2012-01-17 18:35:04', 'end_time' => '2012-01-17 18:35:04', 'breakpoint' => 0, 'migration_name' => 'TestMigration2'],
                     ],
                     null,
-                    '== 20120116183504 TestMigration2: reverted'
+                    '== 20120116183504 TestMigration2: reverted',
                 ],
             'Rollback last executed version which was the first created version - no breakpoints set' =>
                 [
@@ -4017,7 +4030,7 @@ class ManagerTest extends TestCase
                         '20120111235330' => ['version' => '20120111235330', 'start_time' => '2012-01-20 23:53:30', 'end_time' => '2012-01-20 23:53:30', 'breakpoint' => 0, 'migration_name' => 'TestMigration2'],
                     ],
                     null,
-                    '== 20120111235330 TestMigration: reverted'
+                    '== 20120111235330 TestMigration: reverted',
                 ],
             'Rollback to non-existing version - no breakpoints set' =>
                 [
@@ -4048,7 +4061,7 @@ class ManagerTest extends TestCase
                         '20120116183504' => ['version' => '20120116183504', 'start_time' => '2012-01-17 18:35:04', 'end_time' => '2012-01-17 18:35:04', 'breakpoint' => 0, 'migration_name' => 'TestMigration2'],
                     ],
                     '20120111235330',
-                    '== 20120116183504 TestMigration2: reverted'
+                    '== 20120116183504 TestMigration2: reverted',
                 ],
             'Rollback to last created version which was also the last to be executed - breakpoint set on first (executed and created) migration' =>
                 [
@@ -4057,7 +4070,7 @@ class ManagerTest extends TestCase
                         '20120116183504' => ['version' => '20120116183504', 'start_time' => '2012-01-17 18:35:04', 'end_time' => '2012-01-17 18:35:04', 'breakpoint' => 0, 'migration_name' => 'TestMigration2'],
                     ],
                     '20120116183504',
-                    'No migrations to rollback'
+                    'No migrations to rollback',
                 ],
             'Rollback all versions (ie. rollback to version 0) - breakpoint set on first (executed and created) migration' =>
                 [
@@ -4066,7 +4079,7 @@ class ManagerTest extends TestCase
                         '20120116183504' => ['version' => '20120116183504', 'start_time' => '2012-01-17 18:35:04', 'end_time' => '2012-01-17 18:35:04', 'breakpoint' => 0, 'migration_name' => 'TestMigration2'],
                     ],
                     '0',
-                    ['== 20120116183504 TestMigration2: reverted', 'Breakpoint reached. Further rollbacks inhibited.']
+                    ['== 20120116183504 TestMigration2: reverted', 'Breakpoint reached. Further rollbacks inhibited.'],
                 ],
             'Rollback to second created version which was the first to be executed - breakpoint set on first executed migration' =>
                 [
@@ -4075,7 +4088,7 @@ class ManagerTest extends TestCase
                         '20120111235330' => ['version' => '20120111235330', 'start_time' => '2012-01-12 23:53:30', 'end_time' => '2012-01-12 23:53:30', 'breakpoint' => 0, 'migration_name' => 'TestMigration2'],
                     ],
                     '20120116183504',
-                    '== 20120111235330 TestMigration: reverted'
+                    '== 20120111235330 TestMigration: reverted',
                 ],
             'Rollback to second created version which was the first to be executed - breakpoint set on first created migration' =>
                 [
@@ -4084,7 +4097,7 @@ class ManagerTest extends TestCase
                         '20120111235330' => ['version' => '20120111235330', 'start_time' => '2012-01-12 23:53:30', 'end_time' => '2012-01-12 23:53:30', 'breakpoint' => 1, 'migration_name' => 'TestMigration2'],
                     ],
                     '20120116183504',
-                    'Breakpoint reached. Further rollbacks inhibited.'
+                    'Breakpoint reached. Further rollbacks inhibited.',
                 ],
             'Rollback to first created version which was the second to be executed - breakpoint set on first executed migration' =>
                 [
@@ -4093,7 +4106,7 @@ class ManagerTest extends TestCase
                         '20120111235330' => ['version' => '20120111235330', 'start_time' => '2012-01-20 23:53:30', 'end_time' => '2012-01-20 23:53:30', 'breakpoint' => 0, 'migration_name' => 'TestMigration2'],
                     ],
                     '20120111235330',
-                    'No migrations to rollback'
+                    'No migrations to rollback',
                 ],
             'Rollback to first created version which was the second to be executed - breakpoint set on first created migration' =>
                 [
@@ -4102,7 +4115,7 @@ class ManagerTest extends TestCase
                         '20120111235330' => ['version' => '20120111235330', 'start_time' => '2012-01-20 23:53:30', 'end_time' => '2012-01-20 23:53:30', 'breakpoint' => 1, 'migration_name' => 'TestMigration2'],
                     ],
                     '20120111235330',
-                    'No migrations to rollback'
+                    'No migrations to rollback',
                 ],
             'Rollback last executed version which was also the last created version - breakpoint set on first (executed and created) migration' =>
                 [
@@ -4111,7 +4124,7 @@ class ManagerTest extends TestCase
                         '20120116183504' => ['version' => '20120116183504', 'start_time' => '2012-01-17 18:35:04', 'end_time' => '2012-01-17 18:35:04', 'breakpoint' => 0, 'migration_name' => 'TestMigration2'],
                     ],
                     null,
-                    '== 20120116183504 TestMigration2: reverted'
+                    '== 20120116183504 TestMigration2: reverted',
                 ],
             'Rollback last executed version which was the first created version - breakpoint set on first executed migration' =>
                 [
@@ -4120,7 +4133,7 @@ class ManagerTest extends TestCase
                         '20120111235330' => ['version' => '20120111235330', 'start_time' => '2012-01-20 23:53:30', 'end_time' => '2012-01-20 23:53:30', 'breakpoint' => 0, 'migration_name' => 'TestMigration2'],
                     ],
                     null,
-                    '== 20120111235330 TestMigration: reverted'
+                    '== 20120111235330 TestMigration: reverted',
                 ],
             'Rollback last executed version which was the first created version - breakpoint set on first created migration' =>
                 [
@@ -4129,7 +4142,7 @@ class ManagerTest extends TestCase
                         '20120111235330' => ['version' => '20120111235330', 'start_time' => '2012-01-20 23:53:30', 'end_time' => '2012-01-20 23:53:30', 'breakpoint' => 1, 'migration_name' => 'TestMigration2'],
                     ],
                     null,
-                    'Breakpoint reached. Further rollbacks inhibited.'
+                    'Breakpoint reached. Further rollbacks inhibited.',
                 ],
             'Rollback to non-existing version - breakpoint set on first executed migration' =>
                 [
@@ -4160,7 +4173,7 @@ class ManagerTest extends TestCase
                         '20120116183504' => ['version' => '20120116183504', 'start_time' => '2012-01-17 18:35:04', 'end_time' => '2012-01-17 18:35:04', 'breakpoint' => 1, 'migration_name' => 'TestMigration2'],
                     ],
                     '20120111235330',
-                    'Breakpoint reached. Further rollbacks inhibited.'
+                    'Breakpoint reached. Further rollbacks inhibited.',
                 ],
             'Rollback to last created version which was also the last to be executed - breakpoint set on last (executed and created) migration' =>
                 [
@@ -4169,7 +4182,7 @@ class ManagerTest extends TestCase
                         '20120116183504' => ['version' => '20120116183504', 'start_time' => '2012-01-17 18:35:04', 'end_time' => '2012-01-17 18:35:04', 'breakpoint' => 1, 'migration_name' => 'TestMigration2'],
                     ],
                     '20120116183504',
-                    'No migrations to rollback'
+                    'No migrations to rollback',
                 ],
             'Rollback all versions (ie. rollback to version 0) - breakpoint set on last (executed and created) migration' =>
                 [
@@ -4178,7 +4191,7 @@ class ManagerTest extends TestCase
                         '20120116183504' => ['version' => '20120116183504', 'start_time' => '2012-01-17 18:35:04', 'end_time' => '2012-01-17 18:35:04', 'breakpoint' => 1, 'migration_name' => 'TestMigration2'],
                     ],
                     '0',
-                    ['Breakpoint reached. Further rollbacks inhibited.']
+                    ['Breakpoint reached. Further rollbacks inhibited.'],
                 ],
             'Rollback to second created version which was the first to be executed - breakpoint set on last executed migration' =>
                 [
@@ -4187,7 +4200,7 @@ class ManagerTest extends TestCase
                         '20120111235330' => ['version' => '20120111235330', 'start_time' => '2012-01-12 23:53:30', 'end_time' => '2012-01-12 23:53:30', 'breakpoint' => 1, 'migration_name' => 'TestMigration2'],
                     ],
                     '20120116183504',
-                    'Breakpoint reached. Further rollbacks inhibited.'
+                    'Breakpoint reached. Further rollbacks inhibited.',
                 ],
             'Rollback to second created version which was the first to be executed - breakpoint set on last created migration' =>
                 [
@@ -4196,7 +4209,7 @@ class ManagerTest extends TestCase
                         '20120111235330' => ['version' => '20120111235330', 'start_time' => '2012-01-12 23:53:30', 'end_time' => '2012-01-12 23:53:30', 'breakpoint' => 0, 'migration_name' => 'TestMigration2'],
                     ],
                     '20120116183504',
-                    '== 20120111235330 TestMigration: reverted'
+                    '== 20120111235330 TestMigration: reverted',
                 ],
             'Rollback to first created version which was the second to be executed - breakpoint set on last executed migration' =>
                 [
@@ -4205,7 +4218,7 @@ class ManagerTest extends TestCase
                         '20120111235330' => ['version' => '20120111235330', 'start_time' => '2012-01-20 23:53:30', 'end_time' => '2012-01-20 23:53:30', 'breakpoint' => 1, 'migration_name' => 'TestMigration2'],
                     ],
                     '20120111235330',
-                    'No migrations to rollback'
+                    'No migrations to rollback',
                 ],
             'Rollback to first created version which was the second to be executed - breakpoint set on last created migration' =>
                 [
@@ -4214,7 +4227,7 @@ class ManagerTest extends TestCase
                         '20120111235330' => ['version' => '20120111235330', 'start_time' => '2012-01-20 23:53:30', 'end_time' => '2012-01-20 23:53:30', 'breakpoint' => 0, 'migration_name' => 'TestMigration2'],
                     ],
                     '20120111235330',
-                    'No migrations to rollback'
+                    'No migrations to rollback',
                 ],
             'Rollback last executed version which was also the last created version - breakpoint set on last (executed and created) migration' =>
                 [
@@ -4223,7 +4236,7 @@ class ManagerTest extends TestCase
                         '20120116183504' => ['version' => '20120116183504', 'start_time' => '2012-01-17 18:35:04', 'end_time' => '2012-01-17 18:35:04', 'breakpoint' => 1, 'migration_name' => 'TestMigration2'],
                     ],
                     null,
-                    'Breakpoint reached. Further rollbacks inhibited.'
+                    'Breakpoint reached. Further rollbacks inhibited.',
                 ],
             'Rollback last executed version which was the first created version - breakpoint set on last executed migration' =>
                 [
@@ -4232,7 +4245,7 @@ class ManagerTest extends TestCase
                         '20120111235330' => ['version' => '20120111235330', 'start_time' => '2012-01-20 23:53:30', 'end_time' => '2012-01-20 23:53:30', 'breakpoint' => 1, 'migration_name' => 'TestMigration2'],
                     ],
                     null,
-                    'Breakpoint reached. Further rollbacks inhibited.'
+                    'Breakpoint reached. Further rollbacks inhibited.',
                 ],
             'Rollback last executed version which was the first created version - breakpoint set on last created migration' =>
                 [
@@ -4241,7 +4254,7 @@ class ManagerTest extends TestCase
                         '20120111235330' => ['version' => '20120111235330', 'start_time' => '2012-01-20 23:53:30', 'end_time' => '2012-01-20 23:53:30', 'breakpoint' => 0, 'migration_name' => 'TestMigration2'],
                     ],
                     null,
-                    '== 20120111235330 TestMigration: reverted'
+                    '== 20120111235330 TestMigration: reverted',
                 ],
             'Rollback to non-existing version - breakpoint set on last executed migration' =>
                 [
@@ -4272,7 +4285,7 @@ class ManagerTest extends TestCase
                         '20120116183504' => ['version' => '20120116183504', 'start_time' => '2012-01-17 18:35:04', 'end_time' => '2012-01-17 18:35:04', 'breakpoint' => 1, 'migration_name' => 'TestMigration2'],
                     ],
                     '20120111235330',
-                    'Breakpoint reached. Further rollbacks inhibited.'
+                    'Breakpoint reached. Further rollbacks inhibited.',
                 ],
             'Rollback to last created version which was also the last to be executed - breakpoint set on all migrations' =>
                 [
@@ -4281,7 +4294,7 @@ class ManagerTest extends TestCase
                         '20120116183504' => ['version' => '20120116183504', 'start_time' => '2012-01-17 18:35:04', 'end_time' => '2012-01-17 18:35:04', 'breakpoint' => 1, 'migration_name' => 'TestMigration2'],
                     ],
                     '20120116183504',
-                    'No migrations to rollback'
+                    'No migrations to rollback',
                 ],
             'Rollback all versions (ie. rollback to version 0) - breakpoint set on all migrations' =>
                 [
@@ -4290,7 +4303,7 @@ class ManagerTest extends TestCase
                         '20120116183504' => ['version' => '20120116183504', 'start_time' => '2012-01-17 18:35:04', 'end_time' => '2012-01-17 18:35:04', 'breakpoint' => 1, 'migration_name' => 'TestMigration2'],
                     ],
                     '0',
-                    ['Breakpoint reached. Further rollbacks inhibited.']
+                    ['Breakpoint reached. Further rollbacks inhibited.'],
                 ],
             'Rollback to second created version which was the first to be executed - breakpoint set on all migrations' =>
                 [
@@ -4299,7 +4312,7 @@ class ManagerTest extends TestCase
                         '20120111235330' => ['version' => '20120111235330', 'start_time' => '2012-01-12 23:53:30', 'end_time' => '2012-01-12 23:53:30', 'breakpoint' => 1, 'migration_name' => 'TestMigration2'],
                     ],
                     '20120116183504',
-                    'Breakpoint reached. Further rollbacks inhibited.'
+                    'Breakpoint reached. Further rollbacks inhibited.',
                 ],
             'Rollback to first created version which was the second to be executed - breakpoint set on all migrations' =>
                 [
@@ -4308,7 +4321,7 @@ class ManagerTest extends TestCase
                         '20120111235330' => ['version' => '20120111235330', 'start_time' => '2012-01-20 23:53:30', 'end_time' => '2012-01-20 23:53:30', 'breakpoint' => 1, 'migration_name' => 'TestMigration2'],
                     ],
                     '20120111235330',
-                    'No migrations to rollback'
+                    'No migrations to rollback',
                 ],
             'Rollback last executed version which was also the last created version - breakpoint set on all migrations' =>
                 [
@@ -4317,7 +4330,7 @@ class ManagerTest extends TestCase
                         '20120116183504' => ['version' => '20120116183504', 'start_time' => '2012-01-17 18:35:04', 'end_time' => '2012-01-17 18:35:04', 'breakpoint' => 1, 'migration_name' => 'TestMigration2'],
                     ],
                     null,
-                    'Breakpoint reached. Further rollbacks inhibited.'
+                    'Breakpoint reached. Further rollbacks inhibited.',
                 ],
             'Rollback last executed version which was the first created version - breakpoint set on all migrations' =>
                 [
@@ -4326,7 +4339,7 @@ class ManagerTest extends TestCase
                         '20120111235330' => ['version' => '20120111235330', 'start_time' => '2012-01-20 23:53:30', 'end_time' => '2012-01-20 23:53:30', 'breakpoint' => 1, 'migration_name' => 'TestMigration2'],
                     ],
                     null,
-                    'Breakpoint reached. Further rollbacks inhibited.'
+                    'Breakpoint reached. Further rollbacks inhibited.',
                 ],
             'Rollback to non-existing version - breakpoint set on all migrations' =>
                 [
@@ -4363,7 +4376,7 @@ class ManagerTest extends TestCase
                         '20160116183504' => ['version' => '20160116183504', 'start_time' => '2016-01-17 18:35:04', 'end_time' => '2016-01-17 18:35:04', 'breakpoint' => 0],
                     ],
                     '20160111235330',
-                    '== 20160116183504 Foo\Bar\TestMigration2: reverted'
+                    '== 20160116183504 Foo\Bar\TestMigration2: reverted',
                 ],
             'Rollback to last created version which was also the last to be executed - no breakpoints set' =>
                 [
@@ -4372,7 +4385,7 @@ class ManagerTest extends TestCase
                         '20160116183504' => ['version' => '20160116183504', 'start_time' => '2016-01-17 18:35:04', 'end_time' => '2016-01-17 18:35:04', 'breakpoint' => 0],
                     ],
                     '20160116183504',
-                    'No migrations to rollback'
+                    'No migrations to rollback',
                 ],
             'Rollback all versions (ie. rollback to version 0) - no breakpoints set' =>
                 [
@@ -4381,7 +4394,7 @@ class ManagerTest extends TestCase
                         '20160116183504' => ['version' => '20160116183504', 'start_time' => '2016-01-17 18:35:04', 'end_time' => '2016-01-17 18:35:04', 'breakpoint' => 0],
                     ],
                     '0',
-                    ['== 20160111235330 Foo\Bar\TestMigration: reverted', '== 20160116183504 Foo\Bar\TestMigration2: reverted']
+                    ['== 20160111235330 Foo\Bar\TestMigration: reverted', '== 20160116183504 Foo\Bar\TestMigration2: reverted'],
                 ],
             'Rollback to second created version which was the first to be executed - no breakpoints set' =>
                 [
@@ -4390,7 +4403,7 @@ class ManagerTest extends TestCase
                         '20160111235330' => ['version' => '20160111235330', 'start_time' => '2016-01-12 23:53:30', 'end_time' => '2016-01-12 23:53:30', 'breakpoint' => 0],
                     ],
                     '20160116183504',
-                    '== 20160111235330 Foo\Bar\TestMigration: reverted'
+                    '== 20160111235330 Foo\Bar\TestMigration: reverted',
                 ],
             'Rollback to first created version which was the second to be executed - no breakpoints set' =>
                 [
@@ -4399,7 +4412,7 @@ class ManagerTest extends TestCase
                         '20160111235330' => ['version' => '20160111235330', 'start_time' => '2016-01-20 23:53:30', 'end_time' => '2016-01-20 23:53:30', 'breakpoint' => 0],
                     ],
                     '20160111235330',
-                    'No migrations to rollback'
+                    'No migrations to rollback',
                 ],
             'Rollback last executed version which was also the last created version - no breakpoints set' =>
                 [
@@ -4408,7 +4421,7 @@ class ManagerTest extends TestCase
                         '20160116183504' => ['version' => '20160116183504', 'start_time' => '2016-01-17 18:35:04', 'end_time' => '2016-01-17 18:35:04', 'breakpoint' => 0],
                     ],
                     null,
-                    '== 20160116183504 Foo\Bar\TestMigration2: reverted'
+                    '== 20160116183504 Foo\Bar\TestMigration2: reverted',
                 ],
             'Rollback last executed version which was the first created version - no breakpoints set' =>
                 [
@@ -4417,7 +4430,7 @@ class ManagerTest extends TestCase
                         '20160111235330' => ['version' => '20160111235330', 'start_time' => '2016-01-20 23:53:30', 'end_time' => '2016-01-20 23:53:30', 'breakpoint' => 0],
                     ],
                     null,
-                    '== 20160111235330 Foo\Bar\TestMigration: reverted'
+                    '== 20160111235330 Foo\Bar\TestMigration: reverted',
                 ],
             'Rollback to non-existing version - no breakpoints set' =>
                 [
@@ -4448,7 +4461,7 @@ class ManagerTest extends TestCase
                         '20160116183504' => ['version' => '20160116183504', 'start_time' => '2016-01-17 18:35:04', 'end_time' => '2016-01-17 18:35:04', 'breakpoint' => 0],
                     ],
                     '20160111235330',
-                    '== 20160116183504 Foo\Bar\TestMigration2: reverted'
+                    '== 20160116183504 Foo\Bar\TestMigration2: reverted',
                 ],
             'Rollback to last created version which was also the last to be executed - breakpoint set on first (executed and created) migration' =>
                 [
@@ -4457,7 +4470,7 @@ class ManagerTest extends TestCase
                         '20160116183504' => ['version' => '20160116183504', 'start_time' => '2016-01-17 18:35:04', 'end_time' => '2016-01-17 18:35:04', 'breakpoint' => 0],
                     ],
                     '20160116183504',
-                    'No migrations to rollback'
+                    'No migrations to rollback',
                 ],
             'Rollback all versions (ie. rollback to version 0) - breakpoint set on first (executed and created) migration' =>
                 [
@@ -4466,7 +4479,7 @@ class ManagerTest extends TestCase
                         '20160116183504' => ['version' => '20160116183504', 'start_time' => '2016-01-17 18:35:04', 'end_time' => '2016-01-17 18:35:04', 'breakpoint' => 0],
                     ],
                     '0',
-                    ['== 20160116183504 Foo\Bar\TestMigration2: reverted', 'Breakpoint reached. Further rollbacks inhibited.']
+                    ['== 20160116183504 Foo\Bar\TestMigration2: reverted', 'Breakpoint reached. Further rollbacks inhibited.'],
                 ],
             'Rollback to second created version which was the first to be executed - breakpoint set on first executed migration' =>
                 [
@@ -4475,7 +4488,7 @@ class ManagerTest extends TestCase
                         '20160111235330' => ['version' => '20160111235330', 'start_time' => '2016-01-12 23:53:30', 'end_time' => '2016-01-12 23:53:30', 'breakpoint' => 0],
                     ],
                     '20160116183504',
-                    '== 20160111235330 Foo\Bar\TestMigration: reverted'
+                    '== 20160111235330 Foo\Bar\TestMigration: reverted',
                 ],
             'Rollback to second created version which was the first to be executed - breakpoint set on first created migration' =>
                 [
@@ -4484,7 +4497,7 @@ class ManagerTest extends TestCase
                         '20160111235330' => ['version' => '20160111235330', 'start_time' => '2016-01-12 23:53:30', 'end_time' => '2016-01-12 23:53:30', 'breakpoint' => 1],
                     ],
                     '20160116183504',
-                    'Breakpoint reached. Further rollbacks inhibited.'
+                    'Breakpoint reached. Further rollbacks inhibited.',
                 ],
             'Rollback to first created version which was the second to be executed - breakpoint set on first executed migration' =>
                 [
@@ -4493,7 +4506,7 @@ class ManagerTest extends TestCase
                         '20160111235330' => ['version' => '20160111235330', 'start_time' => '2016-01-20 23:53:30', 'end_time' => '2016-01-20 23:53:30', 'breakpoint' => 0],
                     ],
                     '20160111235330',
-                    'No migrations to rollback'
+                    'No migrations to rollback',
                 ],
             'Rollback to first created version which was the second to be executed - breakpoint set on first created migration' =>
                 [
@@ -4502,7 +4515,7 @@ class ManagerTest extends TestCase
                         '20160111235330' => ['version' => '20160111235330', 'start_time' => '2016-01-20 23:53:30', 'end_time' => '2016-01-20 23:53:30', 'breakpoint' => 1],
                     ],
                     '20160111235330',
-                    'No migrations to rollback'
+                    'No migrations to rollback',
                 ],
             'Rollback last executed version which was also the last created version - breakpoint set on first (executed and created) migration' =>
                 [
@@ -4511,7 +4524,7 @@ class ManagerTest extends TestCase
                         '20160116183504' => ['version' => '20160116183504', 'start_time' => '2016-01-17 18:35:04', 'end_time' => '2016-01-17 18:35:04', 'breakpoint' => 0],
                     ],
                     null,
-                    '== 20160116183504 Foo\Bar\TestMigration2: reverted'
+                    '== 20160116183504 Foo\Bar\TestMigration2: reverted',
                 ],
             'Rollback last executed version which was the first created version - breakpoint set on first executed migration' =>
                 [
@@ -4520,7 +4533,7 @@ class ManagerTest extends TestCase
                         '20160111235330' => ['version' => '20160111235330', 'start_time' => '2016-01-20 23:53:30', 'end_time' => '2016-01-20 23:53:30', 'breakpoint' => 0],
                     ],
                     null,
-                    '== 20160111235330 Foo\Bar\TestMigration: reverted'
+                    '== 20160111235330 Foo\Bar\TestMigration: reverted',
                 ],
             'Rollback last executed version which was the first created version - breakpoint set on first created migration' =>
                 [
@@ -4529,7 +4542,7 @@ class ManagerTest extends TestCase
                         '20160111235330' => ['version' => '20160111235330', 'start_time' => '2016-01-20 23:53:30', 'end_time' => '2016-01-20 23:53:30', 'breakpoint' => 1],
                     ],
                     null,
-                    'Breakpoint reached. Further rollbacks inhibited.'
+                    'Breakpoint reached. Further rollbacks inhibited.',
                 ],
             'Rollback to non-existing version - breakpoint set on first executed migration' =>
                 [
@@ -4560,7 +4573,7 @@ class ManagerTest extends TestCase
                         '20160116183504' => ['version' => '20160116183504', 'start_time' => '2016-01-17 18:35:04', 'end_time' => '2016-01-17 18:35:04', 'breakpoint' => 1],
                     ],
                     '20160111235330',
-                    'Breakpoint reached. Further rollbacks inhibited.'
+                    'Breakpoint reached. Further rollbacks inhibited.',
                 ],
             'Rollback to last created version which was also the last to be executed - breakpoint set on last (executed and created) migration' =>
                 [
@@ -4569,7 +4582,7 @@ class ManagerTest extends TestCase
                         '20160116183504' => ['version' => '20160116183504', 'start_time' => '2016-01-17 18:35:04', 'end_time' => '2016-01-17 18:35:04', 'breakpoint' => 1],
                     ],
                     '20160116183504',
-                    'No migrations to rollback'
+                    'No migrations to rollback',
                 ],
             'Rollback all versions (ie. rollback to version 0) - breakpoint set on last (executed and created) migration' =>
                 [
@@ -4578,7 +4591,7 @@ class ManagerTest extends TestCase
                         '20160116183504' => ['version' => '20160116183504', 'start_time' => '2016-01-17 18:35:04', 'end_time' => '2016-01-17 18:35:04', 'breakpoint' => 1],
                     ],
                     '0',
-                    ['Breakpoint reached. Further rollbacks inhibited.']
+                    ['Breakpoint reached. Further rollbacks inhibited.'],
                 ],
             'Rollback to second created version which was the first to be executed - breakpoint set on last executed migration' =>
                 [
@@ -4587,7 +4600,7 @@ class ManagerTest extends TestCase
                         '20160111235330' => ['version' => '20160111235330', 'start_time' => '2016-01-12 23:53:30', 'end_time' => '2016-01-12 23:53:30', 'breakpoint' => 1],
                     ],
                     '20160116183504',
-                    'Breakpoint reached. Further rollbacks inhibited.'
+                    'Breakpoint reached. Further rollbacks inhibited.',
                 ],
             'Rollback to second created version which was the first to be executed - breakpoint set on last created migration' =>
                 [
@@ -4596,7 +4609,7 @@ class ManagerTest extends TestCase
                         '20160111235330' => ['version' => '20160111235330', 'start_time' => '2016-01-12 23:53:30', 'end_time' => '2016-01-12 23:53:30', 'breakpoint' => 0],
                     ],
                     '20160116183504',
-                    '== 20160111235330 Foo\Bar\TestMigration: reverted'
+                    '== 20160111235330 Foo\Bar\TestMigration: reverted',
                 ],
             'Rollback to first created version which was the second to be executed - breakpoint set on last executed migration' =>
                 [
@@ -4605,7 +4618,7 @@ class ManagerTest extends TestCase
                         '20160111235330' => ['version' => '20160111235330', 'start_time' => '2016-01-20 23:53:30', 'end_time' => '2016-01-20 23:53:30', 'breakpoint' => 1],
                     ],
                     '20160111235330',
-                    'No migrations to rollback'
+                    'No migrations to rollback',
                 ],
             'Rollback to first created version which was the second to be executed - breakpoint set on last created migration' =>
                 [
@@ -4614,7 +4627,7 @@ class ManagerTest extends TestCase
                         '20160111235330' => ['version' => '20160111235330', 'start_time' => '2016-01-20 23:53:30', 'end_time' => '2016-01-20 23:53:30', 'breakpoint' => 0],
                     ],
                     '20160111235330',
-                    'No migrations to rollback'
+                    'No migrations to rollback',
                 ],
             'Rollback last executed version which was also the last created version - breakpoint set on last (executed and created) migration' =>
                 [
@@ -4623,7 +4636,7 @@ class ManagerTest extends TestCase
                         '20160116183504' => ['version' => '20160116183504', 'start_time' => '2016-01-17 18:35:04', 'end_time' => '2016-01-17 18:35:04', 'breakpoint' => 1],
                     ],
                     null,
-                    'Breakpoint reached. Further rollbacks inhibited.'
+                    'Breakpoint reached. Further rollbacks inhibited.',
                 ],
             'Rollback last executed version which was the first created version - breakpoint set on last executed migration' =>
                 [
@@ -4632,7 +4645,7 @@ class ManagerTest extends TestCase
                         '20160111235330' => ['version' => '20160111235330', 'start_time' => '2016-01-20 23:53:30', 'end_time' => '2016-01-20 23:53:30', 'breakpoint' => 1],
                     ],
                     null,
-                    'Breakpoint reached. Further rollbacks inhibited.'
+                    'Breakpoint reached. Further rollbacks inhibited.',
                 ],
             'Rollback last executed version which was the first created version - breakpoint set on last created migration' =>
                 [
@@ -4641,7 +4654,7 @@ class ManagerTest extends TestCase
                         '20160111235330' => ['version' => '20160111235330', 'start_time' => '2016-01-20 23:53:30', 'end_time' => '2016-01-20 23:53:30', 'breakpoint' => 0],
                     ],
                     null,
-                    '== 20160111235330 Foo\Bar\TestMigration: reverted'
+                    '== 20160111235330 Foo\Bar\TestMigration: reverted',
                 ],
             'Rollback to non-existing version - breakpoint set on last executed migration' =>
                 [
@@ -4672,7 +4685,7 @@ class ManagerTest extends TestCase
                         '20160116183504' => ['version' => '20160116183504', 'start_time' => '2016-01-17 18:35:04', 'end_time' => '2016-01-17 18:35:04', 'breakpoint' => 1],
                     ],
                     '20160111235330',
-                    'Breakpoint reached. Further rollbacks inhibited.'
+                    'Breakpoint reached. Further rollbacks inhibited.',
                 ],
             'Rollback to last created version which was also the last to be executed - breakpoint set on all migrations' =>
                 [
@@ -4681,7 +4694,7 @@ class ManagerTest extends TestCase
                         '20160116183504' => ['version' => '20160116183504', 'start_time' => '2016-01-17 18:35:04', 'end_time' => '2016-01-17 18:35:04', 'breakpoint' => 1],
                     ],
                     '20160116183504',
-                    'No migrations to rollback'
+                    'No migrations to rollback',
                 ],
             'Rollback all versions (ie. rollback to version 0) - breakpoint set on all migrations' =>
                 [
@@ -4690,7 +4703,7 @@ class ManagerTest extends TestCase
                         '20160116183504' => ['version' => '20160116183504', 'start_time' => '2016-01-17 18:35:04', 'end_time' => '2016-01-17 18:35:04', 'breakpoint' => 1],
                     ],
                     '0',
-                    ['Breakpoint reached. Further rollbacks inhibited.']
+                    ['Breakpoint reached. Further rollbacks inhibited.'],
                 ],
             'Rollback to second created version which was the first to be executed - breakpoint set on all migrations' =>
                 [
@@ -4699,7 +4712,7 @@ class ManagerTest extends TestCase
                         '20160111235330' => ['version' => '20160111235330', 'start_time' => '2016-01-12 23:53:30', 'end_time' => '2016-01-12 23:53:30', 'breakpoint' => 1],
                     ],
                     '20160116183504',
-                    'Breakpoint reached. Further rollbacks inhibited.'
+                    'Breakpoint reached. Further rollbacks inhibited.',
                 ],
             'Rollback to first created version which was the second to be executed - breakpoint set on all migrations' =>
                 [
@@ -4708,7 +4721,7 @@ class ManagerTest extends TestCase
                         '20160111235330' => ['version' => '20160111235330', 'start_time' => '2016-01-20 23:53:30', 'end_time' => '2016-01-20 23:53:30', 'breakpoint' => 1],
                     ],
                     '20160111235330',
-                    'No migrations to rollback'
+                    'No migrations to rollback',
                 ],
             'Rollback last executed version which was also the last created version - breakpoint set on all migrations' =>
                 [
@@ -4717,7 +4730,7 @@ class ManagerTest extends TestCase
                         '20160116183504' => ['version' => '20160116183504', 'start_time' => '2016-01-17 18:35:04', 'end_time' => '2016-01-17 18:35:04', 'breakpoint' => 1],
                     ],
                     null,
-                    'Breakpoint reached. Further rollbacks inhibited.'
+                    'Breakpoint reached. Further rollbacks inhibited.',
                 ],
             'Rollback last executed version which was the first created version - breakpoint set on all migrations' =>
                 [
@@ -4726,7 +4739,7 @@ class ManagerTest extends TestCase
                         '20160111235330' => ['version' => '20160111235330', 'start_time' => '2016-01-20 23:53:30', 'end_time' => '2016-01-20 23:53:30', 'breakpoint' => 1],
                     ],
                     null,
-                    'Breakpoint reached. Further rollbacks inhibited.'
+                    'Breakpoint reached. Further rollbacks inhibited.',
                 ],
             'Rollback to non-existing version - breakpoint set on all migrations' =>
                 [
@@ -4768,7 +4781,7 @@ class ManagerTest extends TestCase
                         '20120116183504' => ['version' => '20120116183504', 'start_time' => '2012-01-16 18:35:04', 'breakpoint' => 0],
                     ],
                     \Phinx\Config\Config::VERSION_ORDER_CREATION_TIME,
-                    '== 20120116183504 TestMigration2: reverted'
+                    '== 20120116183504 TestMigration2: reverted',
                 ],
 
             'Rollback to last migration with execution time version ordering - no breakpoints set' =>
@@ -4778,7 +4791,7 @@ class ManagerTest extends TestCase
                         '20120111235330' => ['version' => '20120111235330', 'start_time' => '2012-01-12 23:53:30', 'breakpoint' => 0],
                     ],
                     \Phinx\Config\Config::VERSION_ORDER_EXECUTION_TIME,
-                    '== 20120111235330 TestMigration: reverted'
+                    '== 20120111235330 TestMigration: reverted',
                 ],
 
             'Rollback to last migration with missing last migration and creation time version ordering - no breakpoints set' =>
@@ -4789,7 +4802,7 @@ class ManagerTest extends TestCase
                         '20130101225232' => ['version' => '20130101225232', 'start_time' => '2013-01-01 22:52:32', 'breakpoint' => 0],
                     ],
                     \Phinx\Config\Config::VERSION_ORDER_CREATION_TIME,
-                    '== 20120116183504 TestMigration2: reverted'
+                    '== 20120116183504 TestMigration2: reverted',
                 ],
 
             'Rollback to last migration with missing last migration and execution time version ordering - no breakpoints set' =>
@@ -4800,7 +4813,7 @@ class ManagerTest extends TestCase
                         '20130101225232' => ['version' => '20130101225232', 'start_time' => '2013-01-01 22:52:32', 'breakpoint' => 0],
                     ],
                     \Phinx\Config\Config::VERSION_ORDER_EXECUTION_TIME,
-                    '== 20120111235330 TestMigration: reverted'
+                    '== 20120111235330 TestMigration: reverted',
                 ],
 
             // Breakpoint set on last migration
@@ -4812,7 +4825,7 @@ class ManagerTest extends TestCase
                         '20120116183504' => ['version' => '20120116183504', 'start_time' => '2012-01-16 18:35:04', 'breakpoint' => 1],
                     ],
                     \Phinx\Config\Config::VERSION_ORDER_CREATION_TIME,
-                    'Breakpoint reached. Further rollbacks inhibited.'
+                    'Breakpoint reached. Further rollbacks inhibited.',
                 ],
 
             'Rollback to last migration with creation time version ordering - breakpoint set on last executed migration' =>
@@ -4822,7 +4835,7 @@ class ManagerTest extends TestCase
                         '20120116183504' => ['version' => '20120116183504', 'start_time' => '2012-01-16 18:35:04', 'breakpoint' => 0],
                     ],
                     \Phinx\Config\Config::VERSION_ORDER_CREATION_TIME,
-                    '== 20120116183504 TestMigration2: reverted'
+                    '== 20120116183504 TestMigration2: reverted',
                 ],
 
             'Rollback to last migration with missing last migration and creation time version ordering - breakpoint set on last non-missing created migration' =>
@@ -4833,7 +4846,7 @@ class ManagerTest extends TestCase
                         '20130101225232' => ['version' => '20130101225232', 'start_time' => '2013-01-01 22:52:32', 'breakpoint' => 0],
                     ],
                     \Phinx\Config\Config::VERSION_ORDER_CREATION_TIME,
-                    'Breakpoint reached. Further rollbacks inhibited.'
+                    'Breakpoint reached. Further rollbacks inhibited.',
                 ],
 
             'Rollback to last migration with missing last migration and execution time version ordering - breakpoint set on last non-missing executed migration' =>
@@ -4844,7 +4857,7 @@ class ManagerTest extends TestCase
                         '20130101225232' => ['version' => '20130101225232', 'start_time' => '2013-01-01 22:52:32', 'breakpoint' => 0],
                     ],
                     \Phinx\Config\Config::VERSION_ORDER_EXECUTION_TIME,
-                    'Breakpoint reached. Further rollbacks inhibited.'
+                    'Breakpoint reached. Further rollbacks inhibited.',
                 ],
 
             'Rollback to last migration with missing last migration and creation time version ordering - breakpoint set on missing migration' =>
@@ -4855,7 +4868,7 @@ class ManagerTest extends TestCase
                         '20130101225232' => ['version' => '20130101225232', 'start_time' => '2013-01-01 22:52:32', 'breakpoint' => 1],
                     ],
                     \Phinx\Config\Config::VERSION_ORDER_CREATION_TIME,
-                    '== 20120116183504 TestMigration2: reverted'
+                    '== 20120116183504 TestMigration2: reverted',
                 ],
 
             'Rollback to last migration with missing last migration and execution time version ordering - breakpoint set on missing migration' =>
@@ -4866,7 +4879,7 @@ class ManagerTest extends TestCase
                         '20130101225232' => ['version' => '20130101225232', 'start_time' => '2013-01-01 22:52:32', 'breakpoint' => 1],
                     ],
                     \Phinx\Config\Config::VERSION_ORDER_EXECUTION_TIME,
-                    '== 20120111235330 TestMigration: reverted'
+                    '== 20120111235330 TestMigration: reverted',
                 ],
 
             // Breakpoint set on all migrations
@@ -4878,7 +4891,7 @@ class ManagerTest extends TestCase
                         '20120116183504' => ['version' => '20120116183504', 'start_time' => '2012-01-16 18:35:04', 'breakpoint' => 1],
                     ],
                     \Phinx\Config\Config::VERSION_ORDER_CREATION_TIME,
-                    'Breakpoint reached. Further rollbacks inhibited.'
+                    'Breakpoint reached. Further rollbacks inhibited.',
                 ],
 
             'Rollback to last migration with creation time version ordering - breakpoint set on all migrations' =>
@@ -4888,7 +4901,7 @@ class ManagerTest extends TestCase
                         '20120116183504' => ['version' => '20120116183504', 'start_time' => '2012-01-16 18:35:04', 'breakpoint' => 1],
                     ],
                     \Phinx\Config\Config::VERSION_ORDER_CREATION_TIME,
-                    'Breakpoint reached. Further rollbacks inhibited.'
+                    'Breakpoint reached. Further rollbacks inhibited.',
                 ],
 
             'Rollback to last migration with missing last migration and creation time version ordering - breakpoint set on all migrations' =>
@@ -4899,7 +4912,7 @@ class ManagerTest extends TestCase
                         '20130101225232' => ['version' => '20130101225232', 'start_time' => '2013-01-01 22:52:32', 'breakpoint' => 1],
                     ],
                     \Phinx\Config\Config::VERSION_ORDER_CREATION_TIME,
-                    'Breakpoint reached. Further rollbacks inhibited.'
+                    'Breakpoint reached. Further rollbacks inhibited.',
                 ],
 
             'Rollback to last migration with missing last migration and execution time version ordering - breakpoint set on all migrations' =>
@@ -4910,7 +4923,7 @@ class ManagerTest extends TestCase
                         '20130101225232' => ['version' => '20130101225232', 'start_time' => '2013-01-01 22:52:32', 'breakpoint' => 1],
                     ],
                     \Phinx\Config\Config::VERSION_ORDER_EXECUTION_TIME,
-                    'Breakpoint reached. Further rollbacks inhibited.'
+                    'Breakpoint reached. Further rollbacks inhibited.',
                 ],
             ];
     }
@@ -4933,7 +4946,7 @@ class ManagerTest extends TestCase
                         '20160116183504' => ['version' => '20160116183504', 'start_time' => '2016-01-16 18:35:04', 'breakpoint' => 0],
                     ],
                     \Phinx\Config\Config::VERSION_ORDER_CREATION_TIME,
-                    '== 20160116183504 Foo\Bar\TestMigration2: reverted'
+                    '== 20160116183504 Foo\Bar\TestMigration2: reverted',
                 ],
 
             'Rollback to last migration with execution time version ordering - no breakpoints set' =>
@@ -4943,7 +4956,7 @@ class ManagerTest extends TestCase
                         '20160111235330' => ['version' => '20160111235330', 'start_time' => '2016-01-12 23:53:30', 'breakpoint' => 0],
                     ],
                     \Phinx\Config\Config::VERSION_ORDER_EXECUTION_TIME,
-                    '== 20160111235330 Foo\Bar\TestMigration: reverted'
+                    '== 20160111235330 Foo\Bar\TestMigration: reverted',
                 ],
 
             'Rollback to last migration with missing last migration and creation time version ordering - no breakpoints set' =>
@@ -4954,7 +4967,7 @@ class ManagerTest extends TestCase
                         '20170101225232' => ['version' => '20170101225232', 'start_time' => '2017-01-01 22:52:32', 'breakpoint' => 0],
                     ],
                     \Phinx\Config\Config::VERSION_ORDER_CREATION_TIME,
-                    '== 20160116183504 Foo\Bar\TestMigration2: reverted'
+                    '== 20160116183504 Foo\Bar\TestMigration2: reverted',
                 ],
 
             'Rollback to last migration with missing last migration and execution time version ordering - no breakpoints set' =>
@@ -4965,7 +4978,7 @@ class ManagerTest extends TestCase
                         '20170101225232' => ['version' => '20130101225232', 'start_time' => '2017-01-01 22:52:32', 'breakpoint' => 0],
                     ],
                     \Phinx\Config\Config::VERSION_ORDER_EXECUTION_TIME,
-                    '== 20160111235330 Foo\Bar\TestMigration: reverted'
+                    '== 20160111235330 Foo\Bar\TestMigration: reverted',
                 ],
 
             // Breakpoint set on last migration
@@ -4977,7 +4990,7 @@ class ManagerTest extends TestCase
                         '20160116183504' => ['version' => '20160116183504', 'start_time' => '2016-01-16 18:35:04', 'breakpoint' => 1],
                     ],
                     \Phinx\Config\Config::VERSION_ORDER_CREATION_TIME,
-                    'Breakpoint reached. Further rollbacks inhibited.'
+                    'Breakpoint reached. Further rollbacks inhibited.',
                 ],
 
             'Rollback to last migration with creation time version ordering - breakpoint set on last executed migration' =>
@@ -4987,7 +5000,7 @@ class ManagerTest extends TestCase
                         '20160116183504' => ['version' => '20160116183504', 'start_time' => '2016-01-16 18:35:04', 'breakpoint' => 0],
                     ],
                     \Phinx\Config\Config::VERSION_ORDER_CREATION_TIME,
-                    '== 20160116183504 Foo\Bar\TestMigration2: reverted'
+                    '== 20160116183504 Foo\Bar\TestMigration2: reverted',
                 ],
 
             'Rollback to last migration with missing last migration and creation time version ordering - breakpoint set on last non-missing created migration' =>
@@ -4998,7 +5011,7 @@ class ManagerTest extends TestCase
                         '20170101225232' => ['version' => '20170101225232', 'start_time' => '2017-01-01 22:52:32', 'breakpoint' => 0],
                     ],
                     \Phinx\Config\Config::VERSION_ORDER_CREATION_TIME,
-                    'Breakpoint reached. Further rollbacks inhibited.'
+                    'Breakpoint reached. Further rollbacks inhibited.',
                 ],
 
             'Rollback to last migration with missing last migration and execution time version ordering - breakpoint set on last non-missing executed migration' =>
@@ -5009,7 +5022,7 @@ class ManagerTest extends TestCase
                         '20170101225232' => ['version' => '20170101225232', 'start_time' => '2017-01-01 22:52:32', 'breakpoint' => 0],
                     ],
                     \Phinx\Config\Config::VERSION_ORDER_EXECUTION_TIME,
-                    'Breakpoint reached. Further rollbacks inhibited.'
+                    'Breakpoint reached. Further rollbacks inhibited.',
                 ],
 
             'Rollback to last migration with missing last migration and creation time version ordering - breakpoint set on missing migration' =>
@@ -5020,7 +5033,7 @@ class ManagerTest extends TestCase
                         '20170101225232' => ['version' => '20170101225232', 'start_time' => '2017-01-01 22:52:32', 'breakpoint' => 1],
                     ],
                     \Phinx\Config\Config::VERSION_ORDER_CREATION_TIME,
-                    '== 20160116183504 Foo\Bar\TestMigration2: reverted'
+                    '== 20160116183504 Foo\Bar\TestMigration2: reverted',
                 ],
 
             'Rollback to last migration with missing last migration and execution time version ordering - breakpoint set on missing migration' =>
@@ -5031,7 +5044,7 @@ class ManagerTest extends TestCase
                         '20170101225232' => ['version' => '20170101225232', 'start_time' => '2017-01-01 22:52:32', 'breakpoint' => 1],
                     ],
                     \Phinx\Config\Config::VERSION_ORDER_EXECUTION_TIME,
-                    '== 20160111235330 Foo\Bar\TestMigration: reverted'
+                    '== 20160111235330 Foo\Bar\TestMigration: reverted',
                 ],
 
             // Breakpoint set on all migrations
@@ -5043,7 +5056,7 @@ class ManagerTest extends TestCase
                         '20160116183504' => ['version' => '20160116183504', 'start_time' => '2016-01-16 18:35:04', 'breakpoint' => 1],
                     ],
                     \Phinx\Config\Config::VERSION_ORDER_CREATION_TIME,
-                    'Breakpoint reached. Further rollbacks inhibited.'
+                    'Breakpoint reached. Further rollbacks inhibited.',
                 ],
 
             'Rollback to last migration with creation time version ordering - breakpoint set on all migrations ' =>
@@ -5053,7 +5066,7 @@ class ManagerTest extends TestCase
                         '20160116183504' => ['version' => '20160116183504', 'start_time' => '2016-01-16 18:35:04', 'breakpoint' => 1],
                     ],
                     \Phinx\Config\Config::VERSION_ORDER_CREATION_TIME,
-                    'Breakpoint reached. Further rollbacks inhibited.'
+                    'Breakpoint reached. Further rollbacks inhibited.',
                 ],
 
             'Rollback to last migration with missing last migration and creation time version ordering - breakpoint set on all migrations' =>
@@ -5064,7 +5077,7 @@ class ManagerTest extends TestCase
                         '20170101225232' => ['version' => '20170101225232', 'start_time' => '2017-01-01 22:52:32', 'breakpoint' => 1],
                     ],
                     \Phinx\Config\Config::VERSION_ORDER_CREATION_TIME,
-                    'Breakpoint reached. Further rollbacks inhibited.'
+                    'Breakpoint reached. Further rollbacks inhibited.',
                 ],
 
             'Rollback to last migration with missing last migration and execution time version ordering - breakpoint set on all migrations' =>
@@ -5075,7 +5088,7 @@ class ManagerTest extends TestCase
                         '20170101225232' => ['version' => '20170101225232', 'start_time' => '2017-01-01 22:52:32', 'breakpoint' => 1],
                     ],
                     \Phinx\Config\Config::VERSION_ORDER_EXECUTION_TIME,
-                    'Breakpoint reached. Further rollbacks inhibited.'
+                    'Breakpoint reached. Further rollbacks inhibited.',
                 ],
             ];
     }
@@ -5102,7 +5115,7 @@ class ManagerTest extends TestCase
                         '20160116183504' => ['version' => '20160116183504', 'start_time' => '2017-01-01 00:00:05', 'breakpoint' => 0],
                     ],
                     \Phinx\Config\Config::VERSION_ORDER_CREATION_TIME,
-                    '== 20160116183504 Foo\Bar\TestMigration2: reverted'
+                    '== 20160116183504 Foo\Bar\TestMigration2: reverted',
                 ],
 
             'Rollback to last migration with execution time version ordering - no breakpoints set' =>
@@ -5116,7 +5129,7 @@ class ManagerTest extends TestCase
                         '20150116183504' => ['version' => '20150116183504', 'start_time' => '2017-01-01 00:00:07', 'breakpoint' => 0],
                     ],
                     \Phinx\Config\Config::VERSION_ORDER_EXECUTION_TIME,
-                    '== 20150116183504 Baz\TestMigration2: reverted'
+                    '== 20150116183504 Baz\TestMigration2: reverted',
                 ],
 
             'Rollback to last migration with missing last migration and creation time version ordering - no breakpoints set' =>
@@ -5131,7 +5144,7 @@ class ManagerTest extends TestCase
                         '20170101225232' => ['version' => '20170101225232', 'start_time' => '2017-01-01 22:52:32', 'breakpoint' => 0],
                     ],
                     \Phinx\Config\Config::VERSION_ORDER_CREATION_TIME,
-                    '== 20160116183504 Foo\Bar\TestMigration2: reverted'
+                    '== 20160116183504 Foo\Bar\TestMigration2: reverted',
                 ],
 
             'Rollback to last migration with missing last migration and execution time version ordering - no breakpoints set' =>
@@ -5146,7 +5159,7 @@ class ManagerTest extends TestCase
                         '20170101225232' => ['version' => '20170101225232', 'start_time' => '2017-01-01 22:52:32', 'breakpoint' => 0],
                     ],
                     \Phinx\Config\Config::VERSION_ORDER_EXECUTION_TIME,
-                    '== 20120116183504 TestMigration2: reverted'
+                    '== 20120116183504 TestMigration2: reverted',
                 ],
 
             // Breakpoint set on last migration
@@ -5162,7 +5175,7 @@ class ManagerTest extends TestCase
                         '20160116183504' => ['version' => '20160116183504', 'start_time' => '2017-01-01 00:00:05', 'breakpoint' => 1],
                     ],
                     \Phinx\Config\Config::VERSION_ORDER_CREATION_TIME,
-                    'Breakpoint reached. Further rollbacks inhibited.'
+                    'Breakpoint reached. Further rollbacks inhibited.',
                 ],
 
             'Rollback to last migration with creation time version ordering - breakpoint set on last executed migration' =>
@@ -5176,7 +5189,7 @@ class ManagerTest extends TestCase
                         '20160116183504' => ['version' => '20160116183504', 'start_time' => '2017-01-01 00:00:05', 'breakpoint' => 0],
                     ],
                     \Phinx\Config\Config::VERSION_ORDER_CREATION_TIME,
-                    '== 20160116183504 Foo\Bar\TestMigration2: reverted'
+                    '== 20160116183504 Foo\Bar\TestMigration2: reverted',
                 ],
 
             'Rollback to last migration with missing last migration and creation time version ordering - breakpoint set on last non-missing created migration' =>
@@ -5191,7 +5204,7 @@ class ManagerTest extends TestCase
                         '20170101225232' => ['version' => '20170101225232', 'start_time' => '2017-01-01 22:52:32', 'breakpoint' => 0],
                     ],
                     \Phinx\Config\Config::VERSION_ORDER_CREATION_TIME,
-                    'Breakpoint reached. Further rollbacks inhibited.'
+                    'Breakpoint reached. Further rollbacks inhibited.',
                 ],
 
             'Rollback to last migration with missing last migration and execution time version ordering - breakpoint set on last non-missing executed migration' =>
@@ -5206,7 +5219,7 @@ class ManagerTest extends TestCase
                         '20170101225232' => ['version' => '20170101225232', 'start_time' => '2017-01-01 22:52:32', 'breakpoint' => 0],
                     ],
                     \Phinx\Config\Config::VERSION_ORDER_EXECUTION_TIME,
-                    'Breakpoint reached. Further rollbacks inhibited.'
+                    'Breakpoint reached. Further rollbacks inhibited.',
                 ],
 
             'Rollback to last migration with missing last migration and creation time version ordering - breakpoint set on missing migration' =>
@@ -5221,7 +5234,7 @@ class ManagerTest extends TestCase
                         '20170101225232' => ['version' => '20170101225232', 'start_time' => '2017-01-01 22:52:32', 'breakpoint' => 1],
                     ],
                     \Phinx\Config\Config::VERSION_ORDER_CREATION_TIME,
-                    '== 20160116183504 Foo\Bar\TestMigration2: reverted'
+                    '== 20160116183504 Foo\Bar\TestMigration2: reverted',
                 ],
 
             'Rollback to last migration with missing last migration and execution time version ordering - breakpoint set on missing migration' =>
@@ -5236,7 +5249,7 @@ class ManagerTest extends TestCase
                         '20130101225232' => ['version' => '20130101225232', 'start_time' => '2013-01-01 22:52:32', 'breakpoint' => 1],
                     ],
                     \Phinx\Config\Config::VERSION_ORDER_EXECUTION_TIME,
-                    '== 20120111235330 TestMigration: reverted'
+                    '== 20120111235330 TestMigration: reverted',
                 ],
 
             // Breakpoint set on all migrations
@@ -5252,7 +5265,7 @@ class ManagerTest extends TestCase
                         '20160116183504' => ['version' => '20160116183504', 'start_time' => '2017-01-01 00:00:05', 'breakpoint' => 1],
                     ],
                     \Phinx\Config\Config::VERSION_ORDER_CREATION_TIME,
-                    'Breakpoint reached. Further rollbacks inhibited.'
+                    'Breakpoint reached. Further rollbacks inhibited.',
                 ],
 
             'Rollback to last migration with creation time version ordering - breakpoint set on all migrations ' =>
@@ -5266,7 +5279,7 @@ class ManagerTest extends TestCase
                         '20160116183504' => ['version' => '20160116183504', 'start_time' => '2017-01-01 00:00:05', 'breakpoint' => 1],
                     ],
                     \Phinx\Config\Config::VERSION_ORDER_CREATION_TIME,
-                    'Breakpoint reached. Further rollbacks inhibited.'
+                    'Breakpoint reached. Further rollbacks inhibited.',
                 ],
 
             'Rollback to last migration with missing last migration and creation time version ordering - breakpoint set on all migrations' =>
@@ -5281,7 +5294,7 @@ class ManagerTest extends TestCase
                         '20170101225232' => ['version' => '20170101225232', 'start_time' => '2017-01-01 22:52:32', 'breakpoint' => 1],
                     ],
                     \Phinx\Config\Config::VERSION_ORDER_CREATION_TIME,
-                    'Breakpoint reached. Further rollbacks inhibited.'
+                    'Breakpoint reached. Further rollbacks inhibited.',
                 ],
 
             'Rollback to last migration with missing last migration and execution time version ordering - breakpoint set on all migrations' =>
@@ -5296,7 +5309,7 @@ class ManagerTest extends TestCase
                         '20170101225232' => ['version' => '20170101225232', 'start_time' => '2017-01-01 22:52:32', 'breakpoint' => 1],
                     ],
                     \Phinx\Config\Config::VERSION_ORDER_EXECUTION_TIME,
-                    'Breakpoint reached. Further rollbacks inhibited.'
+                    'Breakpoint reached. Further rollbacks inhibited.',
                 ],
             ];
     }
@@ -5311,9 +5324,9 @@ class ManagerTest extends TestCase
         $this->manager->seed('mockenv');
         rewind($this->manager->getOutput()->getStream());
         $output = stream_get_contents($this->manager->getOutput()->getStream());
-        $this->assertContains('GSeeder', $output);
-        $this->assertContains('PostSeeder', $output);
-        $this->assertContains('UserSeeder', $output);
+        $this->assertStringContainsString('GSeeder', $output);
+        $this->assertStringContainsString('PostSeeder', $output);
+        $this->assertStringContainsString('UserSeeder', $output);
     }
 
     public function testExecuteSeedWorksAsExpectedWithNamespace()
@@ -5327,9 +5340,9 @@ class ManagerTest extends TestCase
         $this->manager->seed('mockenv');
         rewind($this->manager->getOutput()->getStream());
         $output = stream_get_contents($this->manager->getOutput()->getStream());
-        $this->assertContains('Foo\Bar\GSeeder', $output);
-        $this->assertContains('Foo\Bar\PostSeeder', $output);
-        $this->assertContains('Foo\Bar\UserSeeder', $output);
+        $this->assertStringContainsString('Foo\Bar\GSeeder', $output);
+        $this->assertStringContainsString('Foo\Bar\PostSeeder', $output);
+        $this->assertStringContainsString('Foo\Bar\UserSeeder', $output);
     }
 
     public function testExecuteSeedWorksAsExpectedWithMixedNamespace()
@@ -5343,15 +5356,15 @@ class ManagerTest extends TestCase
         $this->manager->seed('mockenv');
         rewind($this->manager->getOutput()->getStream());
         $output = stream_get_contents($this->manager->getOutput()->getStream());
-        $this->assertContains('GSeeder', $output);
-        $this->assertContains('PostSeeder', $output);
-        $this->assertContains('UserSeeder', $output);
-        $this->assertContains('Baz\GSeeder', $output);
-        $this->assertContains('Baz\PostSeeder', $output);
-        $this->assertContains('Baz\UserSeeder', $output);
-        $this->assertContains('Foo\Bar\GSeeder', $output);
-        $this->assertContains('Foo\Bar\PostSeeder', $output);
-        $this->assertContains('Foo\Bar\UserSeeder', $output);
+        $this->assertStringContainsString('GSeeder', $output);
+        $this->assertStringContainsString('PostSeeder', $output);
+        $this->assertStringContainsString('UserSeeder', $output);
+        $this->assertStringContainsString('Baz\GSeeder', $output);
+        $this->assertStringContainsString('Baz\PostSeeder', $output);
+        $this->assertStringContainsString('Baz\UserSeeder', $output);
+        $this->assertStringContainsString('Foo\Bar\GSeeder', $output);
+        $this->assertStringContainsString('Foo\Bar\PostSeeder', $output);
+        $this->assertStringContainsString('Foo\Bar\UserSeeder', $output);
     }
 
     public function testExecuteASingleSeedWorksAsExpected()
@@ -5364,7 +5377,7 @@ class ManagerTest extends TestCase
         $this->manager->seed('mockenv', 'UserSeeder');
         rewind($this->manager->getOutput()->getStream());
         $output = stream_get_contents($this->manager->getOutput()->getStream());
-        $this->assertContains('UserSeeder', $output);
+        $this->assertStringContainsString('UserSeeder', $output);
     }
 
     public function testExecuteASingleSeedWorksAsExpectedWithNamespace()
@@ -5378,7 +5391,7 @@ class ManagerTest extends TestCase
         $this->manager->seed('mockenv', 'Foo\Bar\UserSeeder');
         rewind($this->manager->getOutput()->getStream());
         $output = stream_get_contents($this->manager->getOutput()->getStream());
-        $this->assertContains('Foo\Bar\UserSeeder', $output);
+        $this->assertStringContainsString('Foo\Bar\UserSeeder', $output);
     }
 
     public function testExecuteASingleSeedWorksAsExpectedWithMixedNamespace()
@@ -5392,13 +5405,9 @@ class ManagerTest extends TestCase
         $this->manager->seed('mockenv', 'Baz\UserSeeder');
         rewind($this->manager->getOutput()->getStream());
         $output = stream_get_contents($this->manager->getOutput()->getStream());
-        $this->assertContains('Baz\UserSeeder', $output);
+        $this->assertStringContainsString('Baz\UserSeeder', $output);
     }
 
-    /**
-     * @expectedException \InvalidArgumentException
-     * @expectedExceptionMessage The seed class "NonExistentSeeder" does not exist
-     */
     public function testExecuteANonExistentSeedWorksAsExpected()
     {
         // stub environment
@@ -5406,16 +5415,13 @@ class ManagerTest extends TestCase
             ->setConstructorArgs(['mockenv', []])
             ->getMock();
         $this->manager->setEnvironments(['mockenv' => $envStub]);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('The seed class "NonExistentSeeder" does not exist');
+
         $this->manager->seed('mockenv', 'NonExistentSeeder');
-        rewind($this->manager->getOutput()->getStream());
-        $output = stream_get_contents($this->manager->getOutput()->getStream());
-        $this->assertContains('UserSeeder', $output);
     }
 
-    /**
-     * @expectedException \InvalidArgumentException
-     * @expectedExceptionMessage The seed class "Foo\Bar\NonExistentSeeder" does not exist
-     */
     public function testExecuteANonExistentSeedWorksAsExpectedWithNamespace()
     {
         // stub environment
@@ -5424,16 +5430,13 @@ class ManagerTest extends TestCase
             ->getMock();
         $this->manager->setConfig($this->getConfigWithNamespace());
         $this->manager->setEnvironments(['mockenv' => $envStub]);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('The seed class "Foo\Bar\NonExistentSeeder" does not exist');
+
         $this->manager->seed('mockenv', 'Foo\Bar\NonExistentSeeder');
-        rewind($this->manager->getOutput()->getStream());
-        $output = stream_get_contents($this->manager->getOutput()->getStream());
-        $this->assertContains('Foo\Bar\UserSeeder', $output);
     }
 
-    /**
-     * @expectedException \InvalidArgumentException
-     * @expectedExceptionMessage The seed class "Baz\NonExistentSeeder" does not exist
-     */
     public function testExecuteANonExistentSeedWorksAsExpectedWithMixedNamespace()
     {
         // stub environment
@@ -5442,12 +5445,11 @@ class ManagerTest extends TestCase
             ->getMock();
         $this->manager->setConfig($this->getConfigWithMixedNamespace());
         $this->manager->setEnvironments(['mockenv' => $envStub]);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('The seed class "Baz\NonExistentSeeder" does not exist');
+
         $this->manager->seed('mockenv', 'Baz\NonExistentSeeder');
-        rewind($this->manager->getOutput()->getStream());
-        $output = stream_get_contents($this->manager->getOutput()->getStream());
-        $this->assertContains('UserSeeder', $output);
-        $this->assertContains('Baz\UserSeeder', $output);
-        $this->assertContains('Foo\Bar\UserSeeder', $output);
     }
 
     public function testOrderSeeds()
@@ -5488,19 +5490,18 @@ class ManagerTest extends TestCase
         }
     }
 
-    /**
-     * @expectedException \InvalidArgumentException
-     * @expectedExceptionMessage The environment "invalidenv" does not exist
-     */
     public function testGettingAnInvalidEnvironment()
     {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('The environment "invalidenv" does not exist');
+
         $this->manager->getEnvironment('invalidenv');
     }
 
     public function testReversibleMigrationsWorkAsExpected()
     {
-        if (!TESTS_PHINX_DB_ADAPTER_MYSQL_ENABLED) {
-            $this->markTestSkipped('Mysql tests disabled. See TESTS_PHINX_DB_ADAPTER_MYSQL_ENABLED constant.');
+        if (!defined('MYSQL_DB_CONFIG')) {
+            $this->markTestSkipped('Mysql tests disabled.');
         }
         $configArray = $this->getConfigArray();
         $adapter = $this->manager->getEnvironment('production')->getAdapter();
@@ -5510,8 +5511,8 @@ class ManagerTest extends TestCase
         $config = new Config($configArray);
 
         // ensure the database is empty
-        $adapter->dropDatabase(TESTS_PHINX_DB_ADAPTER_MYSQL_DATABASE);
-        $adapter->createDatabase(TESTS_PHINX_DB_ADAPTER_MYSQL_DATABASE);
+        $adapter->dropDatabase(MYSQL_DB_CONFIG['name']);
+        $adapter->createDatabase(MYSQL_DB_CONFIG['name']);
         $adapter->disconnect();
 
         // migrate to the latest version
@@ -5548,8 +5549,8 @@ class ManagerTest extends TestCase
 
     public function testReversibleMigrationWithIndexConflict()
     {
-        if (!TESTS_PHINX_DB_ADAPTER_MYSQL_ENABLED) {
-            $this->markTestSkipped('Mysql tests disabled. See TESTS_PHINX_DB_ADAPTER_MYSQL_ENABLED constant.');
+        if (!defined('MYSQL_DB_CONFIG')) {
+            $this->markTestSkipped('Mysql tests disabled.');
         }
         $configArray = $this->getConfigArray();
         $adapter = $this->manager->getEnvironment('production')->getAdapter();
@@ -5559,8 +5560,8 @@ class ManagerTest extends TestCase
         $config = new Config($configArray);
 
         // ensure the database is empty
-        $adapter->dropDatabase(TESTS_PHINX_DB_ADAPTER_MYSQL_DATABASE);
-        $adapter->createDatabase(TESTS_PHINX_DB_ADAPTER_MYSQL_DATABASE);
+        $adapter->dropDatabase(MYSQL_DB_CONFIG['name']);
+        $adapter->createDatabase(MYSQL_DB_CONFIG['name']);
         $adapter->disconnect();
 
         // migrate to the latest version
@@ -5586,8 +5587,8 @@ class ManagerTest extends TestCase
 
     public function testReversibleMigrationWithFKConflictOnTableDrop()
     {
-        if (!TESTS_PHINX_DB_ADAPTER_MYSQL_ENABLED) {
-            $this->markTestSkipped('Mysql tests disabled. See TESTS_PHINX_DB_ADAPTER_MYSQL_ENABLED constant.');
+        if (!defined('MYSQL_DB_CONFIG')) {
+            $this->markTestSkipped('Mysql tests disabled.');
         }
         $configArray = $this->getConfigArray();
         $adapter = $this->manager->getEnvironment('production')->getAdapter();
@@ -5597,8 +5598,8 @@ class ManagerTest extends TestCase
         $config = new Config($configArray);
 
         // ensure the database is empty
-        $adapter->dropDatabase(TESTS_PHINX_DB_ADAPTER_MYSQL_DATABASE);
-        $adapter->createDatabase(TESTS_PHINX_DB_ADAPTER_MYSQL_DATABASE);
+        $adapter->dropDatabase(MYSQL_DB_CONFIG['name']);
+        $adapter->createDatabase(MYSQL_DB_CONFIG['name']);
         $adapter->disconnect();
 
         // migrate to the latest version
@@ -5629,8 +5630,8 @@ class ManagerTest extends TestCase
 
     public function testReversibleMigrationsWorkAsExpectedWithNamespace()
     {
-        if (!TESTS_PHINX_DB_ADAPTER_MYSQL_ENABLED) {
-            $this->markTestSkipped('Mysql tests disabled. See TESTS_PHINX_DB_ADAPTER_MYSQL_ENABLED constant.');
+        if (!defined('MYSQL_DB_CONFIG')) {
+            $this->markTestSkipped('Mysql tests disabled.');
         }
         $configArray = $this->getConfigArray();
         $adapter = $this->manager->getEnvironment('production')->getAdapter();
@@ -5640,8 +5641,8 @@ class ManagerTest extends TestCase
         $config = new Config($configArray);
 
         // ensure the database is empty
-        $adapter->dropDatabase(TESTS_PHINX_DB_ADAPTER_MYSQL_DATABASE);
-        $adapter->createDatabase(TESTS_PHINX_DB_ADAPTER_MYSQL_DATABASE);
+        $adapter->dropDatabase(MYSQL_DB_CONFIG['name']);
+        $adapter->createDatabase(MYSQL_DB_CONFIG['name']);
         $adapter->disconnect();
 
         // migrate to the latest version
@@ -5669,8 +5670,8 @@ class ManagerTest extends TestCase
 
     public function testReversibleMigrationsWorkAsExpectedWithMixedNamespace()
     {
-        if (!TESTS_PHINX_DB_ADAPTER_MYSQL_ENABLED) {
-            $this->markTestSkipped('Mysql tests disabled. See TESTS_PHINX_DB_ADAPTER_MYSQL_ENABLED constant.');
+        if (!defined('MYSQL_DB_CONFIG')) {
+            $this->markTestSkipped('Mysql tests disabled.');
         }
         $configArray = $this->getConfigArray();
         $adapter = $this->manager->getEnvironment('production')->getAdapter();
@@ -5684,8 +5685,8 @@ class ManagerTest extends TestCase
         $config = new Config($configArray);
 
         // ensure the database is empty
-        $adapter->dropDatabase(TESTS_PHINX_DB_ADAPTER_MYSQL_DATABASE);
-        $adapter->createDatabase(TESTS_PHINX_DB_ADAPTER_MYSQL_DATABASE);
+        $adapter->dropDatabase(MYSQL_DB_CONFIG['name']);
+        $adapter->createDatabase(MYSQL_DB_CONFIG['name']);
         $adapter->disconnect();
 
         // migrate to the latest version
@@ -5739,8 +5740,8 @@ class ManagerTest extends TestCase
 
     public function testBreakpointsTogglingOperateAsExpected()
     {
-        if (!TESTS_PHINX_DB_ADAPTER_MYSQL_ENABLED) {
-            $this->markTestSkipped('Mysql tests disabled. See TESTS_PHINX_DB_ADAPTER_MYSQL_ENABLED constant.');
+        if (!defined('MYSQL_DB_CONFIG')) {
+            $this->markTestSkipped('Mysql tests disabled.');
         }
         $configArray = $this->getConfigArray();
         $adapter = $this->manager->getEnvironment('production')->getAdapter();
@@ -5748,8 +5749,8 @@ class ManagerTest extends TestCase
         $config = new Config($configArray);
 
         // ensure the database is empty
-        $adapter->dropDatabase(TESTS_PHINX_DB_ADAPTER_MYSQL_DATABASE);
-        $adapter->createDatabase(TESTS_PHINX_DB_ADAPTER_MYSQL_DATABASE);
+        $adapter->dropDatabase(MYSQL_DB_CONFIG['name']);
+        $adapter->createDatabase(MYSQL_DB_CONFIG['name']);
         $adapter->disconnect();
 
         // migrate to the latest version
@@ -5775,7 +5776,7 @@ class ManagerTest extends TestCase
         // ensure no other data has changed.
         foreach ($originalVersions as $originalVersionKey => $originalVersion) {
             foreach ($originalVersion as $column => $value) {
-                if (!is_numeric($column) && $column != 'breakpoint') {
+                if (!is_numeric($column) && $column !== 'breakpoint') {
                     $this->assertEquals($value, $firstToggle[$originalVersionKey][$column]);
                 }
             }
@@ -5795,7 +5796,7 @@ class ManagerTest extends TestCase
         // ensure no other data has changed.
         foreach ($originalVersions as $originalVersionKey => $originalVersion) {
             foreach ($originalVersion as $column => $value) {
-                if (!is_numeric($column) && $column != 'breakpoint') {
+                if (!is_numeric($column) && $column !== 'breakpoint') {
                     $this->assertEquals($value, $secondToggle[$originalVersionKey][$column]);
                 }
             }
@@ -5837,7 +5838,7 @@ class ManagerTest extends TestCase
         // ensure no other data has changed.
         foreach ($originalVersions as $originalVersionKey => $originalVersion) {
             foreach ($originalVersion as $column => $value) {
-                if (!is_numeric($column) && $column != 'breakpoint') {
+                if (!is_numeric($column) && $column !== 'breakpoint') {
                     $this->assertEquals($value, $setLastVersions[$originalVersionKey][$column]);
                 }
             }
@@ -5857,7 +5858,7 @@ class ManagerTest extends TestCase
         // ensure no other data has changed.
         foreach ($originalVersions as $originalVersionKey => $originalVersion) {
             foreach ($originalVersion as $column => $value) {
-                if (!is_numeric($column) && $column != 'breakpoint') {
+                if (!is_numeric($column) && $column !== 'breakpoint') {
                     $this->assertEquals($value, $resetVersions[$originalVersionKey][$column]);
                 }
             }
@@ -5877,7 +5878,7 @@ class ManagerTest extends TestCase
         // ensure no other data has changed.
         foreach ($originalVersions as $originalVersionKey => $originalVersion) {
             foreach ($originalVersion as $column => $value) {
-                if (!is_numeric($column) && $column != 'breakpoint') {
+                if (!is_numeric($column) && $column !== 'breakpoint') {
                     $this->assertEquals($value, $unsetLastVersions[$originalVersionKey][$column]);
                 }
             }
@@ -5906,8 +5907,8 @@ class ManagerTest extends TestCase
 
     public function testBreakpointWithInvalidVersion()
     {
-        if (!TESTS_PHINX_DB_ADAPTER_MYSQL_ENABLED) {
-            $this->markTestSkipped('Mysql tests disabled. See TESTS_PHINX_DB_ADAPTER_MYSQL_ENABLED constant.');
+        if (!defined('MYSQL_DB_CONFIG')) {
+            $this->markTestSkipped('Mysql tests disabled.');
         }
         $configArray = $this->getConfigArray();
         $adapter = $this->manager->getEnvironment('production')->getAdapter();
@@ -5915,8 +5916,8 @@ class ManagerTest extends TestCase
         $config = new Config($configArray);
 
         // ensure the database is empty
-        $adapter->dropDatabase(TESTS_PHINX_DB_ADAPTER_MYSQL_DATABASE);
-        $adapter->createDatabase(TESTS_PHINX_DB_ADAPTER_MYSQL_DATABASE);
+        $adapter->dropDatabase(MYSQL_DB_CONFIG['name']);
+        $adapter->createDatabase(MYSQL_DB_CONFIG['name']);
         $adapter->disconnect();
 
         // migrate to the latest version
@@ -5930,13 +5931,13 @@ class ManagerTest extends TestCase
         rewind($this->manager->getOutput()->getStream());
         $output = stream_get_contents($this->manager->getOutput()->getStream());
 
-        $this->assertContains('is not a valid version', $output);
+        $this->assertStringContainsString('is not a valid version', $output);
     }
 
     public function testPostgresFullMigration()
     {
-        if (!TESTS_PHINX_DB_ADAPTER_POSTGRES_ENABLED) {
-            $this->markTestSkipped('Postgres tests disabled. See TESTS_PHINX_DB_ADAPTER_POSTGRES_ENABLED constant.');
+        if (!defined('PGSQL_DB_CONFIG')) {
+            $this->markTestSkipped('Postgres tests disabled.');
         }
 
         $configArray = $this->getConfigArray();
@@ -5944,23 +5945,15 @@ class ManagerTest extends TestCase
         $configArray['paths']['migrations'] = [
             $this->getCorrectedPath(__DIR__ . '/_files/postgres'),
         ];
-        $configArray['environments']['production'] = [
-            'adapter' => 'pgsql',
-            'host' => TESTS_PHINX_DB_ADAPTER_POSTGRES_HOST,
-            'name' => TESTS_PHINX_DB_ADAPTER_POSTGRES_DATABASE,
-            'user' => TESTS_PHINX_DB_ADAPTER_POSTGRES_USERNAME,
-            'pass' => TESTS_PHINX_DB_ADAPTER_POSTGRES_PASSWORD,
-            'port' => TESTS_PHINX_DB_ADAPTER_POSTGRES_PORT,
-            'schema' => TESTS_PHINX_DB_ADAPTER_POSTGRES_DATABASE_SCHEMA
-        ];
+        $configArray['environments']['production'] = PGSQL_DB_CONFIG;
         $config = new Config($configArray);
         $this->manager->setConfig($config);
 
         $adapter = $this->manager->getEnvironment('production')->getAdapter();
 
         // ensure the database is empty
-        $adapter->dropSchema(TESTS_PHINX_DB_ADAPTER_POSTGRES_DATABASE_SCHEMA);
-        $adapter->createSchema(TESTS_PHINX_DB_ADAPTER_POSTGRES_DATABASE_SCHEMA);
+        $adapter->dropSchema('public');
+        $adapter->createSchema('public');
         $adapter->disconnect();
 
         // migrate to the latest version
@@ -5989,8 +5982,8 @@ class ManagerTest extends TestCase
 
     public function testMigrationWithDropColumnAndForeignKeyAndIndex()
     {
-        if (!TESTS_PHINX_DB_ADAPTER_MYSQL_ENABLED) {
-            $this->markTestSkipped('Mysql tests disabled. See TESTS_PHINX_DB_ADAPTER_MYSQL_ENABLED constant.');
+        if (!defined('MYSQL_DB_CONFIG')) {
+            $this->markTestSkipped('Mysql tests disabled.');
         }
         $configArray = $this->getConfigArray();
         $adapter = $this->manager->getEnvironment('production')->getAdapter();
@@ -6000,8 +5993,8 @@ class ManagerTest extends TestCase
         $config = new Config($configArray);
 
         // ensure the database is empty
-        $adapter->dropDatabase(TESTS_PHINX_DB_ADAPTER_MYSQL_DATABASE);
-        $adapter->createDatabase(TESTS_PHINX_DB_ADAPTER_MYSQL_DATABASE);
+        $adapter->dropDatabase(MYSQL_DB_CONFIG['name']);
+        $adapter->createDatabase(MYSQL_DB_CONFIG['name']);
         $adapter->disconnect();
 
         $this->manager->setConfig($config);
@@ -6043,23 +6036,6 @@ class ManagerTest extends TestCase
         $this->assertFalse($adapter->hasColumn('table1', 'table3_id'));
         $this->assertFalse($adapter->hasForeignKey('table1', ['table3_id'], 'table1_table3_id'));
         $this->assertFalse($adapter->hasIndexByName('table1', 'table1_table3_id'));
-    }
-
-    public function setExpectedException($exceptionName, $exceptionMessage = '', $exceptionCode = null)
-    {
-        if (method_exists($this, 'expectException')) {
-            //PHPUnit 5+
-            $this->expectException($exceptionName);
-            if ($exceptionMessage !== '') {
-                $this->expectExceptionMessage($exceptionMessage);
-            }
-            if ($exceptionCode !== null) {
-                $this->expectExceptionCode($exceptionCode);
-            }
-        } else {
-            //PHPUnit 4
-            parent::setExpectedException($exceptionName, $exceptionMessage, $exceptionCode);
-        }
     }
 
     public function testInvalidVersionBreakpoint()

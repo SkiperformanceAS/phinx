@@ -2,7 +2,9 @@
 
 namespace Test\Phinx\Db\Adapter;
 
+use PDOException;
 use PHPUnit\Framework\TestCase;
+use RuntimeException;
 
 class PdoAdapterTestPDOMock extends \PDO
 {
@@ -36,12 +38,12 @@ class PdoAdapterTest extends TestCase
 {
     private $adapter;
 
-    public function setUp()
+    public function setUp(): void
     {
         $this->adapter = $this->getMockForAbstractClass('\Phinx\Db\Adapter\PdoAdapter', [['foo' => 'bar']]);
     }
 
-    public function tearDown()
+    public function tearDown(): void
     {
         unset($this->adapter);
     }
@@ -104,11 +106,11 @@ class PdoAdapterTest extends TestCase
         $mockRows = [
             [
                 'version' => '20120508120534',
-                'key' => 'value'
+                'key' => 'value',
             ],
             [
                 'version' => '20130508120534',
-                'key' => 'value'
+                'key' => 'value',
             ],
         ];
 
@@ -121,11 +123,11 @@ class PdoAdapterTest extends TestCase
         $expected = [
             '20120508120534' => [
                 'version' => '20120508120534',
-                'key' => 'value'
+                'key' => 'value',
             ],
             '20130508120534' => [
                 'version' => '20130508120534',
-                'key' => 'value'
+                'key' => 'value',
             ],
         ];
 
@@ -136,26 +138,57 @@ class PdoAdapterTest extends TestCase
     {
         return [
             'With Creation Time Version Order' => [
-                \Phinx\Config\Config::VERSION_ORDER_CREATION_TIME, 'version ASC'
+                \Phinx\Config\Config::VERSION_ORDER_CREATION_TIME, 'version ASC',
             ],
             'With Execution Time Version Order' => [
-                \Phinx\Config\Config::VERSION_ORDER_EXECUTION_TIME, 'start_time ASC, version ASC'
+                \Phinx\Config\Config::VERSION_ORDER_EXECUTION_TIME, 'start_time ASC, version ASC',
             ],
         ];
     }
 
-    /**
-     * @expectedException RuntimeException
-     * @expectedExceptionMessage Invalid version_order configuration option
-     */
     public function testGetVersionLogInvalidVersionOrderKO()
     {
+        $this->expectExceptionMessage('Invalid version_order configuration option');
         $adapter = $this->getMockForAbstractClass(
             '\Phinx\Db\Adapter\PdoAdapter',
             [['version_order' => 'invalid']]
         );
 
+        $this->expectException(RuntimeException::class);
+
         $adapter->getVersionLog();
+    }
+
+    public function testGetVersionLongDryRun()
+    {
+        $adapter = $this->getMockForAbstractClass(
+            '\Phinx\Db\Adapter\PdoAdapter',
+            [['version_order' => \Phinx\Config\Config::VERSION_ORDER_CREATION_TIME]],
+            '',
+            true,
+            true,
+            true,
+            ['isDryRunEnabled', 'fetchAll', 'getSchemaTableName', 'quoteTableName']
+        );
+
+        $schemaTableName = 'log';
+
+        $adapter->expects($this->once())
+            ->method('isDryRunEnabled')
+            ->will($this->returnValue(true));
+        $adapter->expects($this->once())
+            ->method('getSchemaTableName')
+            ->will($this->returnValue($schemaTableName));
+        $adapter->expects($this->once())
+            ->method('quoteTableName')
+            ->with($schemaTableName)
+            ->will($this->returnValue("'$schemaTableName'"));
+        $adapter->expects($this->once())
+            ->method('fetchAll')
+            ->with("SELECT * FROM '$schemaTableName' ORDER BY version ASC")
+            ->will($this->throwException(new PDOException()));
+
+        $this->assertEquals([], $adapter->getVersionLog());
     }
 
     /**

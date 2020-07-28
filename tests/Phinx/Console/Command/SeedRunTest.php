@@ -9,7 +9,6 @@ use Phinx\Console\Command\SeedRun;
 use Phinx\Console\PhinxApplication;
 use Phinx\Migration\Manager;
 use PHPUnit\Framework\TestCase;
-use PHPUnit_Framework_MockObject_MockObject;
 use Symfony\Component\Console\Input\ArrayInput;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
@@ -33,7 +32,7 @@ class SeedRunTest extends TestCase
      */
     protected $output;
 
-    protected function setUp()
+    public function setUp(): void
     {
         $this->config = new Config([
             'paths' => [
@@ -42,7 +41,7 @@ class SeedRunTest extends TestCase
             ],
             'environments' => [
                 'default_migration_table' => 'phinxlog',
-                'default_database' => 'development',
+                'default_environment' => 'development',
                 'development' => [
                     'adapter' => 'mysql',
                     'host' => 'fakehost',
@@ -50,8 +49,8 @@ class SeedRunTest extends TestCase
                     'user' => '',
                     'pass' => '',
                     'port' => 3006,
-                ]
-            ]
+                ],
+            ],
         ]);
 
         $this->input = new ArrayInput([]);
@@ -60,14 +59,14 @@ class SeedRunTest extends TestCase
 
     public function testExecute()
     {
-        $application = new PhinxApplication('testing');
+        $application = new PhinxApplication();
         $application->add(new SeedRun());
 
         /** @var SeedRun $command */
         $command = $application->find('seed:run');
 
         // mock the manager class
-        /** @var Manager|PHPUnit_Framework_MockObject_MockObject $managerStub */
+        /** @var Manager|\PHPUnit\Framework\MockObject\MockObject $managerStub */
         $managerStub = $this->getMockBuilder('\Phinx\Migration\Manager')
             ->setConstructorArgs([$this->config, $this->input, $this->output])
             ->getMock();
@@ -83,16 +82,55 @@ class SeedRunTest extends TestCase
         $this->assertRegExp('/no environment specified/', $commandTester->getDisplay());
     }
 
+    public function testExecuteWithDsn()
+    {
+        $application = new PhinxApplication();
+        $application->add(new SeedRun());
+
+        /** @var SeedRun $command */
+        $command = $application->find('seed:run');
+
+        $config = new Config([
+            'paths' => [
+                'migrations' => __FILE__,
+                'seeds' => __FILE__,
+            ],
+            'environments' => [
+                'default_migration_table' => 'phinxlog',
+                'default_database' => 'development',
+                'development' => [
+                    'dsn' => 'mysql://fakehost:3006/development',
+                ],
+            ],
+        ]);
+
+        // mock the manager class
+        /** @var Manager|\PHPUnit\Framework\MockObject\MockObject $managerStub */
+        $managerStub = $this->getMockBuilder('\Phinx\Migration\Manager')
+            ->setConstructorArgs([$config, $this->input, $this->output])
+            ->getMock();
+        $managerStub->expects($this->once())
+                    ->method('seed')->with($this->identicalTo('development'), $this->identicalTo(null));
+
+        $command->setConfig($config);
+        $command->setManager($managerStub);
+
+        $commandTester = new CommandTester($command);
+        $commandTester->execute(['command' => $command->getName()], ['decorated' => false]);
+
+        $this->assertRegExp('/no environment specified/', $commandTester->getDisplay());
+    }
+
     public function testExecuteWithEnvironmentOption()
     {
-        $application = new PhinxApplication('testing');
+        $application = new PhinxApplication();
         $application->add(new SeedRun());
 
         /** @var SeedRun $command */
         $command = $application->find('seed:run');
 
         // mock the manager class
-        /** @var Manager|PHPUnit_Framework_MockObject_MockObject $managerStub */
+        /** @var Manager|\PHPUnit\Framework\MockObject\MockObject $managerStub */
         $managerStub = $this->getMockBuilder('\Phinx\Migration\Manager')
             ->setConstructorArgs([$this->config, $this->input, $this->output])
             ->getMock();
@@ -111,14 +149,14 @@ class SeedRunTest extends TestCase
 
     public function testExecuteWithInvalidEnvironmentOption()
     {
-        $application = new PhinxApplication('testing');
+        $application = new PhinxApplication();
         $application->add(new SeedRun());
 
         /** @var SeedRun $command */
         $command = $application->find('seed:run');
 
         // mock the manager class
-        /** @var Manager|PHPUnit_Framework_MockObject_MockObject $managerStub */
+        /** @var Manager|\PHPUnit\Framework\MockObject\MockObject $managerStub */
         $managerStub = $this->getMockBuilder('\Phinx\Migration\Manager')
             ->setConstructorArgs([$this->config, $this->input, $this->output])
             ->getMock();
@@ -138,14 +176,14 @@ class SeedRunTest extends TestCase
 
     public function testDatabaseNameSpecified()
     {
-        $application = new PhinxApplication('testing');
+        $application = new PhinxApplication();
         $application->add(new SeedRun());
 
         /** @var SeedRun $command */
         $command = $application->find('seed:run');
 
         // mock the manager class
-        /** @var Manager|PHPUnit_Framework_MockObject_MockObject $managerStub */
+        /** @var Manager|\PHPUnit\Framework\MockObject\MockObject $managerStub */
         $managerStub = $this->getMockBuilder('\Phinx\Migration\Manager')
             ->setConstructorArgs([$this->config, $this->input, $this->output])
             ->getMock();
@@ -162,14 +200,14 @@ class SeedRunTest extends TestCase
 
     public function testExecuteMultipleSeeders()
     {
-        $application = new PhinxApplication('testing');
+        $application = new PhinxApplication();
         $application->add(new SeedRun());
 
         /** @var SeedRun $command */
         $command = $application->find('seed:run');
 
         // mock the manager class
-        /** @var Manager|PHPUnit_Framework_MockObject_MockObject $managerStub */
+        /** @var Manager|\PHPUnit\Framework\MockObject\MockObject $managerStub */
         $managerStub = $this->getMockBuilder('\Phinx\Migration\Manager')
             ->setConstructorArgs([$this->config, $this->input, $this->output])
             ->getMock();
@@ -193,5 +231,57 @@ class SeedRunTest extends TestCase
         );
 
         $this->assertRegExp('/no environment specified/', $commandTester->getDisplay());
+    }
+
+    public function testSeedRunMemorySqlite()
+    {
+        $config = new Config([
+            'paths' => [
+                'migrations' => __FILE__,
+                'seeds' => __FILE__,
+            ],
+            'environments' => [
+                'default_migration_table' => 'phinxlog',
+                'default_environment' => 'development',
+                'development' => [
+                    'adapter' => 'sqlite',
+                    'memory' => true,
+                ],
+            ],
+        ]);
+
+        $application = new PhinxApplication();
+        $application->add(new SeedRun());
+
+        /** @var SeedRun $command */
+        $command = $application->find('seed:run');
+
+        // mock the manager class
+        /** @var Manager|\PHPUnit\Framework\MockObject\MockObject $managerStub */
+        $managerStub = $this->getMockBuilder('\Phinx\Migration\Manager')
+            ->setConstructorArgs([$config, $this->input, $this->output])
+            ->getMock();
+        $managerStub->expects($this->once())
+                    ->method('seed')
+                    ->with('development', null);
+
+        $command->setConfig($config);
+        $command->setManager($managerStub);
+
+        $commandTester = new CommandTester($command);
+        $exitCode = $commandTester->execute(
+            [
+                'command' => $command->getName(),
+                '--environment' => 'development',
+            ],
+            ['decorated' => false]
+        );
+
+        $this->assertStringContainsString(implode(PHP_EOL, [
+            "using environment development",
+            "using adapter sqlite",
+            "using database :memory:",
+        ]) . PHP_EOL, $commandTester->getDisplay());
+        $this->assertSame(AbstractCommand::CODE_SUCCESS, $exitCode);
     }
 }

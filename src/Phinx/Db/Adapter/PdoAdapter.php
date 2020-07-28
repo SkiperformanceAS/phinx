@@ -55,7 +55,8 @@ abstract class PdoAdapter extends AbstractAdapter implements DirectActionInterfa
      */
     protected function verboseLog($message)
     {
-        if (!$this->isDryRunEnabled() &&
+        if (
+            !$this->isDryRunEnabled() &&
              $this->getOutput()->getVerbosity() < OutputInterface::VERBOSITY_VERY_VERBOSE
         ) {
             return;
@@ -152,18 +153,14 @@ abstract class PdoAdapter extends AbstractAdapter implements DirectActionInterfa
     }
 
     /**
-     * {@inheritDoc}
-     *
-     * @return void
+     * @inheritDoc
      */
     public function connect()
     {
     }
 
     /**
-     * {@inheritDoc}
-     *
-     * @return void
+     * @inheritDoc
      */
     public function disconnect()
     {
@@ -217,9 +214,7 @@ abstract class PdoAdapter extends AbstractAdapter implements DirectActionInterfa
      */
     public function fetchRow($sql)
     {
-        $result = $this->query($sql);
-
-        return $result->fetch();
+        return $this->query($sql)->fetch();
     }
 
     /**
@@ -227,19 +222,11 @@ abstract class PdoAdapter extends AbstractAdapter implements DirectActionInterfa
      */
     public function fetchAll($sql)
     {
-        $rows = [];
-        $result = $this->query($sql);
-        while ($row = $result->fetch()) {
-            $rows[] = $row;
-        }
-
-        return $rows;
+        return $this->query($sql)->fetchAll();
     }
 
     /**
-     * {@inheritDoc}
-     *
-     * @return void
+     * @inheritDoc
      */
     public function insert(Table $table, $row)
     {
@@ -273,7 +260,7 @@ abstract class PdoAdapter extends AbstractAdapter implements DirectActionInterfa
      *
      * @return mixed
      */
-    private function quoteValue($value)
+    protected function quoteValue($value)
     {
         if (is_numeric($value)) {
             return $value;
@@ -370,7 +357,17 @@ abstract class PdoAdapter extends AbstractAdapter implements DirectActionInterfa
                 throw new RuntimeException('Invalid version_order configuration option');
         }
 
-        $rows = $this->fetchAll(sprintf('SELECT * FROM %s ORDER BY %s', $this->quoteTableName($this->getSchemaTableName()), $orderBy));
+        // This will throw an exception if doing a --dry-run without any migrations as phinxlog
+        // does not exist, so in that case, we can just expect to trivially return empty set
+        try {
+            $rows = $this->fetchAll(sprintf('SELECT * FROM %s ORDER BY %s', $this->quoteTableName($this->getSchemaTableName()), $orderBy));
+        } catch (PDOException $e) {
+            if (!$this->isDryRunEnabled()) {
+                throw $e;
+            }
+            $rows = [];
+        }
+
         foreach ($rows as $version) {
             $result[$version['version']] = $version;
         }
@@ -527,6 +524,7 @@ abstract class PdoAdapter extends AbstractAdapter implements DirectActionInterfa
             'string',
             'char',
             'text',
+            'tinyinteger',
             'smallinteger',
             'integer',
             'biginteger',
@@ -609,9 +607,7 @@ abstract class PdoAdapter extends AbstractAdapter implements DirectActionInterfa
     }
 
     /**
-     * {@inheritDoc}
-     *
-     * @return void
+     * @inheritDoc
      */
     public function addColumn(Table $table, Column $column)
     {
@@ -630,9 +626,7 @@ abstract class PdoAdapter extends AbstractAdapter implements DirectActionInterfa
     abstract protected function getAddColumnInstructions(Table $table, Column $column);
 
     /**
-     * {@inheritDoc}
-     *
-     * @return void
+     * @inheritdoc
      */
     public function renameColumn($tableName, $columnName, $newColumnName)
     {
@@ -643,18 +637,16 @@ abstract class PdoAdapter extends AbstractAdapter implements DirectActionInterfa
     /**
      * Returns the instructions to rename the specified column.
      *
-     * @param string $tableName Table Name
+     * @param string $tableName Table name
      * @param string $columnName Column Name
      * @param string $newColumnName New Column Name
      *
-     * @return AlterInstructions:w
+     * @return \Phinx\Db\Util\AlterInstructions
      */
     abstract protected function getRenameColumnInstructions($tableName, $columnName, $newColumnName);
 
     /**
-     * {@inheritDoc}
-     *
-     * @return void
+     * @inheritdoc
      */
     public function changeColumn($tableName, $columnName, Column $newColumn)
     {
@@ -665,7 +657,7 @@ abstract class PdoAdapter extends AbstractAdapter implements DirectActionInterfa
     /**
      * Returns the instructions to change a table column type.
      *
-     * @param string $tableName Table Name
+     * @param string $tableName Table name
      * @param string $columnName Column Name
      * @param \Phinx\Db\Table\Column $newColumn New Column
      *
@@ -674,9 +666,7 @@ abstract class PdoAdapter extends AbstractAdapter implements DirectActionInterfa
     abstract protected function getChangeColumnInstructions($tableName, $columnName, Column $newColumn);
 
     /**
-     * {@inheritDoc}
-     *
-     * @return void
+     * @inheritdoc
      */
     public function dropColumn($tableName, $columnName)
     {
@@ -687,7 +677,7 @@ abstract class PdoAdapter extends AbstractAdapter implements DirectActionInterfa
     /**
      * Returns the instructions to drop the specified column.
      *
-     * @param string $tableName Table Name
+     * @param string $tableName Table name
      * @param string $columnName Column Name
      *
      * @return \Phinx\Db\Util\AlterInstructions
@@ -695,9 +685,7 @@ abstract class PdoAdapter extends AbstractAdapter implements DirectActionInterfa
     abstract protected function getDropColumnInstructions($tableName, $columnName);
 
     /**
-     * {@inheritDoc}
-     *
-     * @return void
+     * @inheritdoc
      */
     public function addIndex(Table $table, Index $index)
     {
@@ -716,9 +704,7 @@ abstract class PdoAdapter extends AbstractAdapter implements DirectActionInterfa
     abstract protected function getAddIndexInstructions(Table $table, Index $index);
 
     /**
-     * {@inheritDoc}
-     *
-     * @return void
+     * @inheritdoc
      */
     public function dropIndex($tableName, $columns)
     {
@@ -737,9 +723,7 @@ abstract class PdoAdapter extends AbstractAdapter implements DirectActionInterfa
     abstract protected function getDropIndexByColumnsInstructions($tableName, $columns);
 
     /**
-     * {@inheritDoc}
-     *
-     * @return void
+     * @inheritdoc
      */
     public function dropIndexByName($tableName, $indexName)
     {
@@ -758,9 +742,7 @@ abstract class PdoAdapter extends AbstractAdapter implements DirectActionInterfa
     abstract protected function getDropIndexByNameInstructions($tableName, $indexName);
 
     /**
-     * {@inheritDoc}
-     *
-     * @return void
+     * @inheritdoc
      */
     public function addForeignKey(Table $table, ForeignKey $foreignKey)
     {
@@ -773,15 +755,12 @@ abstract class PdoAdapter extends AbstractAdapter implements DirectActionInterfa
      *
      * @param \Phinx\Db\Table\Table $table The table to add the constraint to
      * @param \Phinx\Db\Table\ForeignKey $foreignKey The foreign key to add
-     *
      * @return \Phinx\Db\Util\AlterInstructions
      */
     abstract protected function getAddForeignKeyInstructions(Table $table, ForeignKey $foreignKey);
 
     /**
-     * {@inheritDoc}
-     *
-     * @return void
+     * @inheritDoc
      */
     public function dropForeignKey($tableName, $columns, $constraint = null)
     {
@@ -808,16 +787,14 @@ abstract class PdoAdapter extends AbstractAdapter implements DirectActionInterfa
      * Returns the instructions to drop the specified foreign key from a database table.
      *
      * @param string $tableName The table where the foreign key constraint is
-     * @param array $columns The list of column names
+     * @param string[] $columns The list of column names
      *
      * @return \Phinx\Db\Util\AlterInstructions
      */
     abstract protected function getDropForeignKeyByColumnsInstructions($tableName, $columns);
 
     /**
-     * {@inheritDoc}
-     *
-     * @return void
+     * @inheritdoc
      */
     public function dropTable($tableName)
     {
@@ -828,16 +805,14 @@ abstract class PdoAdapter extends AbstractAdapter implements DirectActionInterfa
     /**
      * Returns the instructions to drop the specified database table.
      *
-     * @param string $tableName Table Name
+     * @param string $tableName Table name
      *
      * @return \Phinx\Db\Util\AlterInstructions
      */
     abstract protected function getDropTableInstructions($tableName);
 
     /**
-     * {@inheritDoc}
-     *
-     * @return void
+     * @inheritdoc
      */
     public function renameTable($tableName, $newTableName)
     {
@@ -848,7 +823,7 @@ abstract class PdoAdapter extends AbstractAdapter implements DirectActionInterfa
     /**
      * Returns the instructions to rename the specified database table.
      *
-     * @param string $tableName Table Name
+     * @param string $tableName Table name
      * @param string $newTableName New Name
      *
      * @return \Phinx\Db\Util\AlterInstructions
@@ -856,9 +831,7 @@ abstract class PdoAdapter extends AbstractAdapter implements DirectActionInterfa
     abstract protected function getRenameTableInstructions($tableName, $newTableName);
 
     /**
-     * {@inheritDoc}
-     *
-     * @return void
+     * @inheritdoc
      */
     public function changePrimaryKey(Table $table, $newColumns)
     {
@@ -870,16 +843,14 @@ abstract class PdoAdapter extends AbstractAdapter implements DirectActionInterfa
      * Returns the instructions to change the primary key for the specified database table.
      *
      * @param \Phinx\Db\Table\Table $table Table
-     * @param string|array|null $newColumns Column name(s) to belong to the primary key, or null to drop the key
+     * @param string|string[]|null $newColumns Column name(s) to belong to the primary key, or null to drop the key
      *
      * @return \Phinx\Db\Util\AlterInstructions
      */
     abstract protected function getChangePrimaryKeyInstructions(Table $table, $newColumns);
 
     /**
-     * {@inheritDoc}
-     *
-     * @return void
+     * @inheritdoc
      */
     public function changeComment(Table $table, $newComment)
     {

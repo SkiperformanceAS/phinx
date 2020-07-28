@@ -3,6 +3,7 @@
 namespace Test\Phinx\Config;
 
 use Phinx\Config\Config;
+use UnexpectedValueException;
 
 /**
  * Class ConfigMigrationPathsTest
@@ -12,12 +13,12 @@ use Phinx\Config\Config;
  */
 class ConfigMigrationPathsTest extends AbstractConfigTest
 {
-    /**
-     * @expectedException \UnexpectedValueException
-     */
     public function testGetMigrationPathsThrowsExceptionForNoPath()
     {
         $config = new Config([]);
+
+        $this->expectException(UnexpectedValueException::class);
+
         $config->getMigrationPaths();
     }
 
@@ -34,14 +35,14 @@ class ConfigMigrationPathsTest extends AbstractConfigTest
     {
         $values = [
             'paths' => [
-                'migrations' => '/test'
-            ]
+                'migrations' => '/test',
+            ],
         ];
 
         $config = new Config($values);
         $paths = $config->getMigrationPaths();
 
-        $this->assertInternalType('array', $paths);
+        $this->assertIsArray($paths);
         $this->assertCount(1, $paths);
     }
 }

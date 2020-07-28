@@ -79,6 +79,10 @@ class Environment
 
         $startTime = microtime(TRUE);
         $migration->setAdapter($this->getAdapter());
+        if (method_exists($migration, MigrationInterface::INIT)) {
+            /** @noinspection PhpUndefinedMethodInspection */
+            $migration->init();
+        }
 
         if (!$fake) {
             // begin the transaction if the adapter supports it
@@ -121,13 +125,17 @@ class Environment
     /**
      * Executes the specified seeder on this environment.
      *
-     * @param \Phinx\Seed\SeedInterface $seed
+     * @param \Phinx\Seed\SeedInterface $seed Seed
      *
      * @return void
      */
     public function executeSeed(SeedInterface $seed)
     {
         $seed->setAdapter($this->getAdapter());
+        if (method_exists($seed, SeedInterface::INIT)) {
+            /** @noinspection PhpUndefinedMethodInspection */
+            $seed->init();
+        }
 
         // begin the transaction if the adapter supports it
         if ($this->getAdapter()->hasTransactions()) {
@@ -190,40 +198,13 @@ class Environment
      */
     public function getOptions()
     {
-        return $this->parseAgnosticDsn($this->options);
-    }
-
-    /**
-     * Parse a database-agnostic DSN into individual options.
-     *
-     * @param array $options Options
-     *
-     * @return array
-     */
-    protected function parseAgnosticDsn(array $options)
-    {
-        if (isset($options['dsn']) && is_string($options['dsn'])) {
-            $regex = '#^(?P<adapter>[^\\:]+)\\://(?:(?P<user>[^\\:@]+)(?:\\:(?P<pass>[^@]*))?@)?'
-                   . '(?P<host>[^\\:@/]+)(?:\\:(?P<port>[1-9]\\d*))?/(?P<name>[^\?]+)(?:\?(?P<query>.*))?$#';
-            if (preg_match($regex, trim($options['dsn']), $parsedOptions)) {
-                $additionalOpts = [];
-                if (isset($parsedOptions['query'])) {
-                    parse_str($parsedOptions['query'], $additionalOpts);
-                }
-                $validOptions = ['adapter', 'user', 'pass', 'host', 'port', 'name'];
-                $parsedOptions = array_filter(array_intersect_key($parsedOptions, array_flip($validOptions)));
-                $options = array_merge($additionalOpts, $parsedOptions, $options);
-                unset($options['dsn']);
-            }
-        }
-
-        return $options;
+        return $this->options;
     }
 
     /**
      * Sets the console input.
      *
-     * @param \Symfony\Component\Console\Input\InputInterface $input
+     * @param \Symfony\Component\Console\Input\InputInterface $input Input
      *
      * @return $this
      */
@@ -311,7 +292,7 @@ class Environment
     public function getCurrentVersion()
     {
         // We don't cache this code as the current version is pretty volatile.
-        // TODO - that means they're no point in a setter then?
+        // that means they're no point in a setter then?
         // maybe we should cache and call a reset() method every time a migration is run
         $versions = $this->getVersions();
         $version = 0;
@@ -377,11 +358,15 @@ class Environment
                 ->getWrapper($options['wrapper'], $adapter);
         }
 
-        if ($this->getInput()) {
+        /** @var \Symfony\Component\Console\Input\InputInterface|null $input */
+        $input = $this->getInput();
+        if ($input) {
             $adapter->setInput($this->getInput());
         }
 
-        if ($this->getOutput()) {
+        /** @var \Symfony\Component\Console\Output\OutputInterface|null $output */
+        $output = $this->getOutput();
+        if ($output) {
             $adapter->setOutput($this->getOutput());
         }
 

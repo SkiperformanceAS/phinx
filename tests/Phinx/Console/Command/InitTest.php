@@ -2,6 +2,8 @@
 
 namespace Test\Phinx\Console\Command;
 
+use InvalidArgumentException;
+use Phinx\Console\Command\AbstractCommand;
 use Phinx\Console\Command\Init;
 use Phinx\Console\PhinxApplication;
 use PHPUnit\Framework\TestCase;
@@ -9,7 +11,7 @@ use Symfony\Component\Console\Tester\CommandTester;
 
 class InitTest extends TestCase
 {
-    protected function setUp()
+    public function setUp(): void
     {
         foreach (['.yaml', '.yml', '.json', '.php'] as $format) {
             $file = sys_get_temp_dir() . '/phinx' . $format;
@@ -21,7 +23,7 @@ class InitTest extends TestCase
 
     protected function writeConfig($configName = '')
     {
-        $application = new PhinxApplication('testing');
+        $application = new PhinxApplication();
         $application->add(new Init());
         $command = $application->find("init");
         $commandTester = new CommandTester($command);
@@ -38,7 +40,7 @@ class InitTest extends TestCase
 
         $commandTester->execute($command, ['decorated' => false]);
 
-        $this->assertContains(
+        $this->assertStringContainsString(
             "created $fullPath",
             $commandTester->getDisplay()
         );
@@ -52,7 +54,7 @@ class InitTest extends TestCase
     public function testDefaultConfigIsWritten()
     {
         $this->writeConfig();
-        $this->assertFileExists(sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'phinx.yml', 'Default format was not yaml');
+        $this->assertFileExists(sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'phinx.php', 'Default format was not php');
     }
 
     public function formatDataProvider()
@@ -85,7 +87,7 @@ class InitTest extends TestCase
         $current_dir = getcwd();
         chdir(sys_get_temp_dir());
 
-        $application = new PhinxApplication('testing');
+        $application = new PhinxApplication();
         $application->add(new Init());
 
         $command = $application->find('init');
@@ -93,12 +95,12 @@ class InitTest extends TestCase
         $commandTester = new CommandTester($command);
         $commandTester->execute(['command' => $command->getName()], ['decorated' => false]);
         $this->assertRegExp(
-            "/created (.*)[\/\\\\]phinx.yml\\n/",
+            "/created (.*)[\/\\\\]phinx\.php\\n/",
             $commandTester->getDisplay(true)
         );
 
         $this->assertFileExists(
-            'phinx.yml',
+            'phinx.php',
             'Phinx configuration not existent'
         );
 
@@ -110,13 +112,13 @@ class InitTest extends TestCase
         $current_dir = getcwd();
         chdir(sys_get_temp_dir());
 
-        $application = new PhinxApplication('testing');
+        $application = new PhinxApplication();
         $application->add(new Init());
 
         $command = $application->find('init');
 
         $commandTester = new CommandTester($command);
-        $commandTester->execute(['command' => $command->getName(), '--format' => 'yaml'], ['decorated' => false]);
+        $commandTester->execute(['command' => $command->getName(), '--format' => AbstractCommand::FORMAT_YML_ALIAS], ['decorated' => false]);
         $this->assertRegExp(
             "/created (.*)[\/\\\\]phinx.yaml\\n/",
             $commandTester->getDisplay(true)
@@ -130,19 +132,19 @@ class InitTest extends TestCase
         chdir($current_dir);
     }
 
-    /**
-     * @expectedException              \InvalidArgumentException
-     * @expectedExceptionMessageRegExp /Config file ".*" already exists./
-     */
     public function testThrowsExceptionWhenConfigFilePresent()
     {
-        touch(sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'phinx.yml');
-        $application = new PhinxApplication('testing');
+        touch(sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'phinx.php');
+        $application = new PhinxApplication();
         $application->add(new Init());
 
         $command = $application->find('init');
 
         $commandTester = new CommandTester($command);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessageMatches('/Config file ".*" already exists./');
+
         $commandTester->execute([
             'command' => $command->getName(),
             'path' => sys_get_temp_dir(),
@@ -151,18 +153,18 @@ class InitTest extends TestCase
         ]);
     }
 
-    /**
-     * @expectedException              \InvalidArgumentException
-     * @expectedExceptionMessageRegExp /Invalid path ".*" for config file./
-     */
     public function testThrowsExceptionWhenInvalidDir()
     {
-        $application = new PhinxApplication('testing');
+        $application = new PhinxApplication();
         $application->add(new Init());
 
         $command = $application->find('init');
 
         $commandTester = new CommandTester($command);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessageMatches('/Invalid path ".*" for config file./');
+
         $commandTester->execute([
             'command' => $command->getName(),
             'path' => '/this/dir/does/not/exists',
@@ -171,24 +173,24 @@ class InitTest extends TestCase
         ]);
     }
 
-    /**
-     * @expectedException              \InvalidArgumentException
-     * @expectedExceptionMessageRegExp /Invalid format "invalid". Format must be either yaml, yml, json, or php./
-     */
     public function testThrowsExceptionWhenInvalidFormat()
     {
-        $application = new PhinxApplication('testing');
+        $application = new PhinxApplication();
         $application->add(new Init());
 
         $command = $application->find('init');
 
         $commandTester = new CommandTester($command);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Invalid format "invalid". Format must be either json, yaml, yml, php.');
+
         $commandTester->execute([
             'command' => $command->getName(),
             'path' => sys_get_temp_dir() . DIRECTORY_SEPARATOR,
-            '--format' => 'invalid'
+            '--format' => 'invalid',
         ], [
-            'decorated' => false
+            'decorated' => false,
         ]);
     }
 }

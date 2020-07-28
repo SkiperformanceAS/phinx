@@ -27,15 +27,21 @@ use UnexpectedValueException;
  */
 abstract class AbstractCommand extends Command
 {
+    public const FORMAT_JSON = 'json';
+    public const FORMAT_YML_ALIAS = 'yaml';
+    public const FORMAT_YML = 'yml';
+    public const FORMAT_PHP = 'php';
+    public const FORMAT_DEFAULT = 'php';
+
     /**
      * The location of the default migration template.
      */
-    const DEFAULT_MIGRATION_TEMPLATE = '/../../Migration/Migration.template.php.dist';
+    protected const DEFAULT_MIGRATION_TEMPLATE = '/../../Migration/Migration.template.php.dist';
 
     /**
      * The location of the default seed template.
      */
-    const DEFAULT_SEED_TEMPLATE = '/../../Seed/Seed.template.php.dist';
+    protected const DEFAULT_SEED_TEMPLATE = '/../../Seed/Seed.template.php.dist';
 
     /**
      * @var \Phinx\Config\ConfigInterface
@@ -56,26 +62,26 @@ abstract class AbstractCommand extends Command
      * Exit code for when command executes successfully
      * @var int
      */
-    const CODE_SUCCESS = 0;
+    public const CODE_SUCCESS = 0;
 
     /**
      * Exit code for when command hits a non-recoverable error during execution
      * @var int
      */
-    const CODE_ERROR = 1;
+    public const CODE_ERROR = 1;
 
     /**
      * Exit code for when status command is run and there are missing migrations
      * @var int
      */
-    const CODE_STATUS_MISSING = 2;
+    public const CODE_STATUS_MISSING = 2;
 
     /**
      * Exit code for when status command is run and there are no missing migations,
      * but does have down migrations
      * @var int
      */
-    const CODE_STATUS_DOWN = 3;
+    public const CODE_STATUS_DOWN = 3;
 
     /**
      * {@inheritDoc}
@@ -91,14 +97,16 @@ abstract class AbstractCommand extends Command
     /**
      * Bootstrap Phinx.
      *
-     * @param \Symfony\Component\Console\Input\InputInterface $input
-     * @param \Symfony\Component\Console\Output\OutputInterface $output
+     * @param \Symfony\Component\Console\Input\InputInterface $input Input
+     * @param \Symfony\Component\Console\Output\OutputInterface $output Output
      *
      * @return void
      */
     public function bootstrap(InputInterface $input, OutputInterface $output)
     {
-        if (!$this->getConfig()) {
+        /** @var \Phinx\Config\ConfigInterface|null $config */
+        $config = $this->getConfig();
+        if (!$config) {
             $this->loadConfig($input, $output);
         }
 
@@ -134,7 +142,7 @@ abstract class AbstractCommand extends Command
     /**
      * Sets the config.
      *
-     * @param \Phinx\Config\ConfigInterface $config
+     * @param \Phinx\Config\ConfigInterface $config Config
      *
      * @return $this
      */
@@ -158,7 +166,7 @@ abstract class AbstractCommand extends Command
     /**
      * Sets the database adapter.
      *
-     * @param \Phinx\Db\Adapter\AdapterInterface $adapter
+     * @param \Phinx\Db\Adapter\AdapterInterface $adapter Adapter
      *
      * @return $this
      */
@@ -182,7 +190,7 @@ abstract class AbstractCommand extends Command
     /**
      * Sets the migration manager.
      *
-     * @param \Phinx\Migration\Manager $manager
+     * @param \Phinx\Migration\Manager $manager Manager
      *
      * @return $this
      */
@@ -206,7 +214,7 @@ abstract class AbstractCommand extends Command
     /**
      * Returns config file path
      *
-     * @param \Symfony\Component\Console\Input\InputInterface $input
+     * @param \Symfony\Component\Console\Input\InputInterface $input Input
      *
      * @return string
      */
@@ -222,15 +230,15 @@ abstract class AbstractCommand extends Command
 
         $cwd = getcwd();
 
-        // locate the phinx config file (default: phinx.yml)
-        // TODO - In future walk the tree in reverse (max 10 levels)
+        // locate the phinx config file
+        // In future walk the tree in reverse (max 10 levels)
         $locator = new FileLocator([
             $cwd . DIRECTORY_SEPARATOR,
         ]);
 
         if (!$useDefault) {
             // Locate() throws an exception if the file does not exist
-            return $locator->locate($configFile, $cwd, $first = true);
+            return $locator->locate($configFile, $cwd, true);
         }
 
         $possibleConfigFiles = ['phinx.php', 'phinx.json', 'phinx.yaml', 'phinx.yml'];
@@ -247,8 +255,8 @@ abstract class AbstractCommand extends Command
     /**
      * Parse the config file and load it into the config object
      *
-     * @param \Symfony\Component\Console\Input\InputInterface $input
-     * @param \Symfony\Component\Console\Output\OutputInterface $output
+     * @param \Symfony\Component\Console\Input\InputInterface $input Input
+     * @param \Symfony\Component\Console\Output\OutputInterface $output Output
      *
      * @throws \InvalidArgumentException
      *
@@ -266,27 +274,29 @@ abstract class AbstractCommand extends Command
             $extension = pathinfo($configFilePath, PATHINFO_EXTENSION);
 
             switch (strtolower($extension)) {
-                case 'json':
-                    $parser = 'json';
+                case self::FORMAT_JSON:
+                    $parser = self::FORMAT_JSON;
                     break;
-                case 'php':
-                    $parser = 'php';
+                case self::FORMAT_YML_ALIAS:
+                case self::FORMAT_YML:
+                    $parser = self::FORMAT_YML;
                     break;
-                case 'yaml':
-                case 'yml':
+                case self::FORMAT_PHP:
                 default:
-                    $parser = 'yaml';
+                    $parser = self::FORMAT_DEFAULT;
+                    break;
             }
         }
 
         switch (strtolower($parser)) {
-            case 'json':
+            case self::FORMAT_JSON:
                 $config = Config::fromJson($configFilePath);
                 break;
-            case 'php':
+            case self::FORMAT_PHP:
                 $config = Config::fromPhp($configFilePath);
                 break;
-            case 'yaml':
+            case self::FORMAT_YML_ALIAS:
+            case self::FORMAT_YML:
                 $config = Config::fromYaml($configFilePath);
                 break;
             default:
@@ -301,8 +311,8 @@ abstract class AbstractCommand extends Command
     /**
      * Load the migrations manager and inject the config
      *
-     * @param \Symfony\Component\Console\Input\InputInterface $input
-     * @param \Symfony\Component\Console\Output\OutputInterface $output
+     * @param \Symfony\Component\Console\Input\InputInterface $input Input
+     * @param \Symfony\Component\Console\Output\OutputInterface $output Output
      *
      * @return void
      */
@@ -310,6 +320,10 @@ abstract class AbstractCommand extends Command
     {
         if ($this->getManager() === null) {
             $manager = new Manager($this->getConfig(), $input, $output);
+            $container = $this->getConfig()->getContainer();
+            if ($container !== null) {
+                $manager->setContainer($container);
+            }
             $this->setManager($manager);
         } else {
             $manager = $this->getManager();
@@ -321,7 +335,7 @@ abstract class AbstractCommand extends Command
     /**
      * Verify that the migration directory exists and is writable.
      *
-     * @param string $path
+     * @param string $path Path
      *
      * @throws \InvalidArgumentException
      *
@@ -347,7 +361,7 @@ abstract class AbstractCommand extends Command
     /**
      * Verify that the seed directory exists and is writable.
      *
-     * @param string $path
+     * @param string $path Path
      *
      * @throws \InvalidArgumentException
      *

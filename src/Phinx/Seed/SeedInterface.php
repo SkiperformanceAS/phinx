@@ -21,7 +21,12 @@ interface SeedInterface
     /**
      * @var string
      */
-    const RUN = 'run';
+    public const RUN = 'run';
+
+    /**
+     * @var string
+     */
+    public const INIT = 'init';
 
     /**
      * Run the seeder.
@@ -49,7 +54,7 @@ interface SeedInterface
     /**
      * Sets the input object to be used in migration object
      *
-     * @param \Symfony\Component\Console\Input\InputInterface $input
+     * @param \Symfony\Component\Console\Input\InputInterface $input Input
      *
      * @return \Phinx\Seed\SeedInterface
      */
@@ -65,7 +70,7 @@ interface SeedInterface
     /**
      * Sets the output object to be used in migration object
      *
-     * @param \Symfony\Component\Console\Output\OutputInterface $output
+     * @param \Symfony\Component\Console\Output\OutputInterface $output Output
      *
      * @return \Phinx\Seed\SeedInterface
      */
@@ -124,8 +129,8 @@ interface SeedInterface
     /**
      * Insert data into a table.
      *
-     * @param string $tableName
-     * @param array $data
+     * @param string $tableName Table name
+     * @param array $data Data
      *
      * @return void
      */
@@ -134,7 +139,7 @@ interface SeedInterface
     /**
      * Checks to see if a table exists.
      *
-     * @param string $tableName Table Name
+     * @param string $tableName Table name
      *
      * @return bool
      */
@@ -145,7 +150,7 @@ interface SeedInterface
      *
      * You can use this class to create and manipulate tables.
      *
-     * @param string $tableName Table Name
+     * @param string $tableName Table name
      * @param array $options Options
      *
      * @return \Phinx\Db\Table

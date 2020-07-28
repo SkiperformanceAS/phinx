@@ -40,27 +40,9 @@ abstract class AbstractSeed implements SeedInterface
     protected $output;
 
     /**
-     * @param \Symfony\Component\Console\Input\InputInterface|null $input
-     * @param \Symfony\Component\Console\Output\OutputInterface|null $output
+     * Override to specify dependencies for dependency injection from the configured PSR-11 container
      */
-    final public function __construct(InputInterface $input = null, OutputInterface $output = null)
-    {
-        if ($input !== null) {
-            $this->setInput($input);
-        }
-        if ($output !== null) {
-            $this->setOutput($output);
-        }
-
-        $this->init();
-    }
-
-    /**
-     * Initialize method.
-     *
-     * @return void
-     */
-    protected function init()
+    public function __construct()
     {
     }
 

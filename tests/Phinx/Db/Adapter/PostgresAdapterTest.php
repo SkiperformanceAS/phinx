@@ -2,6 +2,7 @@
 
 namespace Test\Phinx\Db\Adapter;
 
+use Phinx\Db\Adapter\AbstractAdapter;
 use Phinx\Db\Adapter\PostgresAdapter;
 use Phinx\Db\Adapter\UnsupportedColumnTypeException;
 use Phinx\Db\Table\Column;
@@ -24,8 +25,8 @@ class PostgresAdapterTest extends TestCase
     {
         static $available;
 
-        if (is_null($available)) {
-            $available = in_array('pgsql', \PDO::getAvailableDrivers());
+        if ($available === null) {
+            $available = in_array('pgsql', \PDO::getAvailableDrivers(), true);
         }
 
         return $available;
@@ -36,28 +37,20 @@ class PostgresAdapterTest extends TestCase
      */
     private $adapter;
 
-    public function setUp()
+    public function setUp(): void
     {
-        if (!TESTS_PHINX_DB_ADAPTER_POSTGRES_ENABLED) {
-            $this->markTestSkipped('Postgres tests disabled.  See TESTS_PHINX_DB_ADAPTER_POSTGRES_ENABLED constant.');
+        if (!defined('PGSQL_DB_CONFIG')) {
+            $this->markTestSkipped('Postgres tests disabled.');
         }
 
         if (!self::isPostgresAvailable()) {
             $this->markTestSkipped('Postgres is not available.  Please install php-pdo-pgsql or equivalent package.');
         }
 
-        $options = [
-            'host' => TESTS_PHINX_DB_ADAPTER_POSTGRES_HOST,
-            'name' => TESTS_PHINX_DB_ADAPTER_POSTGRES_DATABASE,
-            'user' => TESTS_PHINX_DB_ADAPTER_POSTGRES_USERNAME,
-            'pass' => TESTS_PHINX_DB_ADAPTER_POSTGRES_PASSWORD,
-            'port' => TESTS_PHINX_DB_ADAPTER_POSTGRES_PORT,
-            'schema' => TESTS_PHINX_DB_ADAPTER_POSTGRES_DATABASE_SCHEMA
-        ];
-        $this->adapter = new PostgresAdapter($options, new ArrayInput([]), new NullOutput());
+        $this->adapter = new PostgresAdapter(PGSQL_DB_CONFIG, new ArrayInput([]), new NullOutput());
 
         $this->adapter->dropAllSchemas();
-        $this->adapter->createSchema($options['schema']);
+        $this->adapter->createSchema('public');
 
         $citext = $this->adapter->fetchRow("SELECT COUNT(*) AS enabled FROM pg_extension WHERE extname = 'citext'");
         if (!$citext['enabled']) {
@@ -68,7 +61,7 @@ class PostgresAdapterTest extends TestCase
         $this->adapter->disconnect();
     }
 
-    public function tearDown()
+    public function tearDown(): void
     {
         if ($this->adapter) {
             $this->adapter->dropAllSchemas();
@@ -101,13 +94,7 @@ class PostgresAdapterTest extends TestCase
 
     public function testConnectionWithInvalidCredentials()
     {
-        $options = [
-            'host' => TESTS_PHINX_DB_ADAPTER_POSTGRES_HOST,
-            'name' => TESTS_PHINX_DB_ADAPTER_POSTGRES_DATABASE,
-            'port' => TESTS_PHINX_DB_ADAPTER_POSTGRES_PORT,
-            'user' => 'invaliduser',
-            'pass' => 'invalidpass'
-        ];
+        $options = ['user' => 'invalidu', 'pass' => 'invalid'] + PGSQL_DB_CONFIG;
 
         try {
             $adapter = new PostgresAdapter($options, new ArrayInput([]), new NullOutput());
@@ -205,7 +192,7 @@ class PostgresAdapterTest extends TestCase
     public function testCreateTableWithNoPrimaryKey()
     {
         $options = [
-            'id' => false
+            'id' => false,
         ];
         $table = new \Phinx\Db\Table('atable', $options, $this->adapter);
         $table->addColumn('user_id', 'integer')
@@ -213,11 +200,58 @@ class PostgresAdapterTest extends TestCase
         $this->assertFalse($this->adapter->hasColumn('atable', 'id'));
     }
 
+    public function testCreateTableWithConflictingPrimaryKeys()
+    {
+        $options = [
+            'primary_key' => 'user_id',
+        ];
+        $table = new \Phinx\Db\Table('atable', $options, $this->adapter);
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('You cannot enable an auto incrementing ID field and a primary key');
+        $table->addColumn('user_id', 'integer')->save();
+    }
+
+    public function testCreateTableWithPrimaryKeySetToImplicitId()
+    {
+        $options = [
+            'primary_key' => 'id',
+        ];
+        $table = new \Phinx\Db\Table('ztable', $options, $this->adapter);
+        $table->addColumn('user_id', 'integer')->save();
+        $this->assertTrue($this->adapter->hasColumn('ztable', 'id'));
+        $this->assertTrue($this->adapter->hasIndex('ztable', 'id'));
+        $this->assertTrue($this->adapter->hasColumn('ztable', 'user_id'));
+    }
+
+    public function testCreateTableWithPrimaryKeyArraySetToImplicitId()
+    {
+        $options = [
+            'primary_key' => ['id'],
+        ];
+        $table = new \Phinx\Db\Table('ztable', $options, $this->adapter);
+        $table->addColumn('user_id', 'integer')->save();
+        $this->assertTrue($this->adapter->hasColumn('ztable', 'id'));
+        $this->assertTrue($this->adapter->hasIndex('ztable', 'id'));
+        $this->assertTrue($this->adapter->hasColumn('ztable', 'user_id'));
+    }
+
+    public function testCreateTableWithMultiplePrimaryKeyArraySetToImplicitId()
+    {
+        $options = [
+            'primary_key' => ['id', 'user_id'],
+        ];
+        $table = new \Phinx\Db\Table('ztable', $options, $this->adapter);
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('You cannot enable an auto incrementing ID field and a primary key');
+        $table->addColumn('user_id', 'integer')->save();
+    }
+
     public function testCreateTableWithMultiplePrimaryKeys()
     {
         $options = [
             'id' => false,
-            'primary_key' => ['user_id', 'tag_id']
+            'primary_key' => ['user_id', 'tag_id'],
         ];
         $table = new \Phinx\Db\Table('table1', $options, $this->adapter);
         $table->addColumn('user_id', 'integer')
@@ -234,7 +268,7 @@ class PostgresAdapterTest extends TestCase
 
         $options = [
             'id' => false,
-            'primary_key' => ['user_id', 'tag_id']
+            'primary_key' => ['user_id', 'tag_id'],
         ];
         $table = new \Phinx\Db\Table('schema1.table1', $options, $this->adapter);
         $table->addColumn('user_id', 'integer')
@@ -245,6 +279,40 @@ class PostgresAdapterTest extends TestCase
         $this->assertFalse($this->adapter->hasIndex('schema1.table1', ['tag_id', 'user_email']));
 
         $this->adapter->dropSchema('schema1');
+    }
+
+    /**
+     * @return void
+     */
+    public function testCreateTableWithPrimaryKeyAsUuid()
+    {
+        $options = [
+            'id' => false,
+            'primary_key' => 'id',
+        ];
+        $table = new \Phinx\Db\Table('ztable', $options, $this->adapter);
+        $table->addColumn('id', 'uuid')->save();
+        $table->addColumn('user_id', 'integer')->save();
+        $this->assertTrue($this->adapter->hasColumn('ztable', 'id'));
+        $this->assertTrue($this->adapter->hasIndex('ztable', 'id'));
+        $this->assertTrue($this->adapter->hasColumn('ztable', 'user_id'));
+    }
+
+    /**
+     * @return void
+     */
+    public function testCreateTableWithPrimaryKeyAsBinaryUuid()
+    {
+        $options = [
+            'id' => false,
+            'primary_key' => 'id',
+        ];
+        $table = new \Phinx\Db\Table('ztable', $options, $this->adapter);
+        $table->addColumn('id', 'binaryuuid')->save();
+        $table->addColumn('user_id', 'integer')->save();
+        $this->assertTrue($this->adapter->hasColumn('ztable', 'id'));
+        $this->assertTrue($this->adapter->hasIndex('ztable', 'id'));
+        $this->assertTrue($this->adapter->hasColumn('ztable', 'user_id'));
     }
 
     public function testCreateTableWithMultipleIndexes()
@@ -435,7 +503,7 @@ class PostgresAdapterTest extends TestCase
               ->save();
         $columns = $this->adapter->getColumns('table1');
         foreach ($columns as $column) {
-            if ($column->getName() == 'default_zero') {
+            if ($column->getName() === 'default_zero') {
                 $this->assertEquals("test", $column->getDefault());
             }
         }
@@ -449,7 +517,7 @@ class PostgresAdapterTest extends TestCase
               ->save();
         $columns = $this->adapter->getColumns('table1');
         foreach ($columns as $column) {
-            if ($column->getName() == 'default_zero') {
+            if ($column->getName() === 'default_zero') {
                 $this->assertNotNull($column->getDefault());
                 $this->assertEquals('0', $column->getDefault());
             }
@@ -466,15 +534,15 @@ class PostgresAdapterTest extends TestCase
               ->save();
         $columns = $this->adapter->getColumns('table1');
         foreach ($columns as $column) {
-            if ($column->getName() == 'default_true') {
+            if ($column->getName() === 'default_true') {
                 $this->assertNotNull($column->getDefault());
                 $this->assertEquals('true', $column->getDefault());
             }
-            if ($column->getName() == 'default_false') {
+            if ($column->getName() === 'default_false') {
                 $this->assertNotNull($column->getDefault());
                 $this->assertEquals('false', $column->getDefault());
             }
-            if ($column->getName() == 'default_null') {
+            if ($column->getName() === 'default_null') {
                 $this->assertNull($column->getDefault());
             }
         }
@@ -514,6 +582,37 @@ class PostgresAdapterTest extends TestCase
         $this->assertNull($column->getLimit());
     }
 
+    public function providerIgnoresLimit(): array
+    {
+        return [
+            [AbstractAdapter::PHINX_TYPE_TINY_INTEGER, AbstractAdapter::PHINX_TYPE_SMALL_INTEGER],
+            [AbstractAdapter::PHINX_TYPE_SMALL_INTEGER],
+            [AbstractAdapter::PHINX_TYPE_INTEGER],
+            [AbstractAdapter::PHINX_TYPE_BIG_INTEGER],
+            [AbstractAdapter::PHINX_TYPE_BOOLEAN],
+            [AbstractAdapter::PHINX_TYPE_TEXT],
+            [AbstractAdapter::PHINX_TYPE_BINARY],
+        ];
+    }
+
+    /**
+     * @dataProvider providerIgnoresLimit
+     */
+    public function testAddColumnIgnoresLimit(string $column_type, ?string $actual_type = null): void
+    {
+        $table = new \Phinx\Db\Table('table1', [], $this->adapter);
+        $table->save();
+        $table->addColumn('column1', $column_type, ['limit' => 1]);
+        $table->save();
+
+        $columns = $this->adapter->getColumns('table1');
+        $this->assertCount(2, $columns);
+        $column = $columns[1];
+        $this->assertSame('column1', $column->getName());
+        $this->assertSame($actual_type ?? $column_type, $column->getType());
+        $this->assertNull($column->getLimit());
+    }
+
     public function testAddColumnWithDefaultLiteral()
     {
         $table = new \Phinx\Db\Table('table1', [], $this->adapter);
@@ -522,7 +621,7 @@ class PostgresAdapterTest extends TestCase
               ->save();
         $columns = $this->adapter->getColumns('table1');
         foreach ($columns as $column) {
-            if ($column->getName() == 'default_ts') {
+            if ($column->getName() === 'default_ts') {
                 $this->assertNotNull($column->getDefault());
                 $this->assertEquals('now()', (string)$column->getDefault());
             }
@@ -569,7 +668,7 @@ class PostgresAdapterTest extends TestCase
             from pg_catalog.pg_class c
             where c.relname=cols.table_name ) as column_comment
             FROM information_schema.columns cols
-            WHERE cols.table_catalog=\'' . TESTS_PHINX_DB_ADAPTER_POSTGRES_DATABASE . '\'
+            WHERE cols.table_catalog=\'' . PGSQL_DB_CONFIG['name'] . '\'
             AND cols.table_name=\'table1\'
             AND cols.column_name = \'email\''
         );
@@ -591,12 +690,12 @@ class PostgresAdapterTest extends TestCase
             ->save();
         $columns = $this->adapter->getColumns('table1');
         foreach ($columns as $column) {
-            if ($column->getName() == 'number') {
+            if ($column->getName() === 'number') {
                 $this->assertEquals("10", $column->getPrecision());
                 $this->assertEquals("2", $column->getScale());
             }
 
-            if ($column->getName() == 'number2') {
+            if ($column->getName() === 'number2') {
                 $this->assertEquals("12", $column->getPrecision());
                 $this->assertEquals("0", $column->getScale());
             }
@@ -613,15 +712,15 @@ class PostgresAdapterTest extends TestCase
             ->save();
         $columns = $this->adapter->getColumns('table1');
         foreach ($columns as $column) {
-            if ($column->getName() == 'timestamp1') {
+            if ($column->getName() === 'timestamp1') {
                 $this->assertEquals("0", $column->getPrecision());
             }
 
-            if ($column->getName() == 'timestamp2') {
+            if ($column->getName() === 'timestamp2') {
                 $this->assertEquals("4", $column->getPrecision());
             }
 
-            if ($column->getName() == 'timestamp3') {
+            if ($column->getName() === 'timestamp3') {
                 $this->assertEquals("6", $column->getPrecision());
             }
         }
@@ -1138,7 +1237,7 @@ class PostgresAdapterTest extends TestCase
     public function testHasDatabase()
     {
         $this->assertFalse($this->adapter->hasDatabase('fake_database_name'));
-        $this->assertTrue($this->adapter->hasDatabase(TESTS_PHINX_DB_ADAPTER_POSTGRES_DATABASE));
+        $this->assertTrue($this->adapter->hasDatabase(PGSQL_DB_CONFIG['name']));
     }
 
     public function testDropDatabase()
@@ -1175,12 +1274,11 @@ class PostgresAdapterTest extends TestCase
         $this->assertFalse($this->adapter->hasSchema('bar'));
     }
 
-    /**
-     * @expectedException \Phinx\Db\Adapter\UnsupportedColumnTypeException
-     * @expectedExceptionMessage Column type "idontexist" is not supported by Postgresql.
-     */
     public function testInvalidSqlType()
     {
+        $this->expectException(UnsupportedColumnTypeException::class);
+        $this->expectExceptionMessage('Column type "idontexist" is not supported by Postgresql.');
+
         $this->adapter->getSqlType('idontexist');
     }
 
@@ -1261,7 +1359,7 @@ class PostgresAdapterTest extends TestCase
             from pg_catalog.pg_class c
             where c.relname=cols.table_name ) as column_comment
             FROM information_schema.columns cols
-            WHERE cols.table_catalog=\'' . TESTS_PHINX_DB_ADAPTER_POSTGRES_DATABASE . '\'
+            WHERE cols.table_catalog=\'' . PGSQL_DB_CONFIG['name'] . '\'
             AND cols.table_name=\'table1\'
             AND cols.column_name = \'field1\''
         );
@@ -1281,7 +1379,7 @@ class PostgresAdapterTest extends TestCase
             from pg_catalog.pg_class c
             where c.relname=cols.table_name ) as column_comment
             FROM information_schema.columns cols
-            WHERE cols.table_catalog=\'' . TESTS_PHINX_DB_ADAPTER_POSTGRES_DATABASE . '\'
+            WHERE cols.table_catalog=\'' . PGSQL_DB_CONFIG['name'] . '\'
             AND cols.table_name=\'user\'
             AND cols.column_name = \'index\''
         );
@@ -1314,7 +1412,7 @@ class PostgresAdapterTest extends TestCase
             from pg_catalog.pg_class c
             where c.relname=cols.table_name ) as column_comment
             FROM information_schema.columns cols
-            WHERE cols.table_catalog=\'' . TESTS_PHINX_DB_ADAPTER_POSTGRES_DATABASE . '\'
+            WHERE cols.table_catalog=\'' . PGSQL_DB_CONFIG['name'] . '\'
             AND cols.table_name=\'table1\'
             AND cols.column_name = \'field1\''
         );
@@ -1340,7 +1438,7 @@ class PostgresAdapterTest extends TestCase
             from pg_catalog.pg_class c
             where c.relname=cols.table_name ) as column_comment
             FROM information_schema.columns cols
-            WHERE cols.table_catalog=\'' . TESTS_PHINX_DB_ADAPTER_POSTGRES_DATABASE . '\'
+            WHERE cols.table_catalog=\'' . PGSQL_DB_CONFIG['name'] . '\'
             AND cols.table_name=\'table1\'
             AND cols.column_name = \'field1\''
         );
@@ -1355,10 +1453,10 @@ class PostgresAdapterTest extends TestCase
     {
         $table = new \Phinx\Db\Table('table1', [], $this->adapter);
         $table->addColumn('comment1', 'string', [
-            'comment' => $comment1 = 'first comment'
+            'comment' => $comment1 = 'first comment',
             ])
             ->addColumn('comment2', 'string', [
-            'comment' => $comment2 = 'second comment'
+            'comment' => $comment2 = 'second comment',
             ])
             ->save();
 
@@ -1368,7 +1466,7 @@ class PostgresAdapterTest extends TestCase
             from pg_catalog.pg_class c
             where c.relname=cols.table_name ) as column_comment
             FROM information_schema.columns cols
-            WHERE cols.table_catalog=\'' . TESTS_PHINX_DB_ADAPTER_POSTGRES_DATABASE . '\'
+            WHERE cols.table_catalog=\'' . PGSQL_DB_CONFIG['name'] . '\'
             AND cols.table_name=\'table1\'
             AND cols.column_name = \'comment1\''
         );
@@ -1381,7 +1479,7 @@ class PostgresAdapterTest extends TestCase
             from pg_catalog.pg_class c
             where c.relname=cols.table_name ) as column_comment
             FROM information_schema.columns cols
-            WHERE cols.table_catalog=\'' . TESTS_PHINX_DB_ADAPTER_POSTGRES_DATABASE . '\'
+            WHERE cols.table_catalog=\'' . PGSQL_DB_CONFIG['name'] . '\'
             AND cols.table_name=\'table1\'
             AND cols.column_name = \'comment2\''
         );
@@ -1396,7 +1494,7 @@ class PostgresAdapterTest extends TestCase
     {
         $table = new \Phinx\Db\Table('widgets', [], $this->adapter);
         $table->addColumn('transport', 'string', [
-            'comment' => $comment = 'One of: car, boat, truck, plane, train'
+            'comment' => $comment = 'One of: car, boat, truck, plane, train',
             ])
             ->save();
 
@@ -1410,7 +1508,7 @@ class PostgresAdapterTest extends TestCase
             from pg_catalog.pg_class c
             where c.relname=cols.table_name ) as column_comment
             FROM information_schema.columns cols
-            WHERE cols.table_catalog=\'' . TESTS_PHINX_DB_ADAPTER_POSTGRES_DATABASE . '\'
+            WHERE cols.table_catalog=\'' . PGSQL_DB_CONFIG['name'] . '\'
             AND cols.table_name=\'widgets\'
             AND cols.column_name = \'transport\''
         );
@@ -1426,12 +1524,12 @@ class PostgresAdapterTest extends TestCase
         $userId = 'user';
         $sessionId = 'session';
 
-        $local = new \Phinx\Db\Table('users', ['primary_key' => $userId, 'id' => $userId], $this->adapter);
+        $local = new \Phinx\Db\Table('users', ['id' => $userId], $this->adapter);
         $local->create();
 
         $foreign = new \Phinx\Db\Table(
             'sessions',
-            ['primary_key' => $sessionId, 'id' => $sessionId],
+            ['id' => $sessionId],
             $this->adapter
         );
         $foreign->addColumn('user', 'integer')
@@ -1450,14 +1548,14 @@ class PostgresAdapterTest extends TestCase
 
         $local = new \Phinx\Db\Table(
             'schema_users.users',
-            ['primary_key' => $userId, 'id' => $userId],
+            ['id' => $userId],
             $this->adapter
         );
         $local->create();
 
         $foreign = new \Phinx\Db\Table(
             'schema_users.sessions',
-            ['primary_key' => $sessionId, 'id' => $sessionId],
+            ['id' => $sessionId],
             $this->adapter
         );
         $foreign->addColumn('user', 'integer')
@@ -1479,14 +1577,14 @@ class PostgresAdapterTest extends TestCase
 
         $local = new \Phinx\Db\Table(
             'schema_users.users',
-            ['primary_key' => $userId, 'id' => $userId],
+            ['id' => $userId],
             $this->adapter
         );
         $local->create();
 
         $foreign = new \Phinx\Db\Table(
             'schema_sessions.sessions',
-            ['primary_key' => $sessionId, 'id' => $sessionId],
+            ['id' => $sessionId],
             $this->adapter
         );
         $foreign->addColumn('user', 'integer')
@@ -1571,7 +1669,7 @@ class PostgresAdapterTest extends TestCase
             [
                 'column1' => 'value3',
                 'column2' => 3,
-            ]
+            ],
         ];
         $table = new \Phinx\Db\Table('table1', [], $this->adapter);
         $table->addColumn('column1', 'string')
@@ -1623,12 +1721,12 @@ class PostgresAdapterTest extends TestCase
               ->insert([
                   [
                       'column1' => 'value1',
-                      'column2' => 1
+                      'column2' => 1,
                   ],
                   [
                       'column1' => 'value2',
-                      'column2' => 2
-                  ]
+                      'column2' => 2,
+                  ],
               ])
               ->save();
 
@@ -1674,12 +1772,12 @@ class PostgresAdapterTest extends TestCase
             ->insert([
                 [
                     'column1' => 'value1',
-                    'column2' => 1
+                    'column2' => 1,
                 ],
                 [
                     'column1' => 'value2',
-                    'column2' => 2
-                ]
+                    'column2' => 2,
+                ],
             ])
             ->save();
 
@@ -1705,7 +1803,7 @@ class PostgresAdapterTest extends TestCase
                   [
                       'column1' => 'value2',
                       'column2' => 2,
-                  ]
+                  ],
               ])
               ->save();
 
@@ -1731,7 +1829,7 @@ class PostgresAdapterTest extends TestCase
                 [
                     'column1' => 'value2',
                     'column2' => 2,
-                ]
+                ],
             ])
             ->save();
 
@@ -1763,7 +1861,7 @@ class PostgresAdapterTest extends TestCase
         'NOT NULL, "column2" INTEGER NOT NULL, "column3" CHARACTER VARYING (255) NOT NULL DEFAULT \'test\', CONSTRAINT ' .
         '"table1_pkey" PRIMARY KEY ("id"));';
         $actualOutput = $consoleOutput->fetch();
-        $this->assertContains(
+        $this->assertStringContainsString(
             $expectedOutput,
             $actualOutput,
             'Passing the --dry-run option does not dump create table query'
@@ -1789,7 +1887,7 @@ class PostgresAdapterTest extends TestCase
         'NOT NULL, "column2" INTEGER NOT NULL, "column3" CHARACTER VARYING (255) NOT NULL DEFAULT \'test\', CONSTRAINT ' .
         '"table1_pkey" PRIMARY KEY ("id"));';
         $actualOutput = $consoleOutput->fetch();
-        $this->assertContains(
+        $this->assertStringContainsString(
             $expectedOutput,
             $actualOutput,
             'Passing the --dry-run option does not dump create table query'
@@ -1815,15 +1913,15 @@ class PostgresAdapterTest extends TestCase
         $this->adapter->setOutput($consoleOutput);
 
         $this->adapter->insert($table->getTable(), [
-            'string_col' => 'test data'
+            'string_col' => 'test data',
         ]);
 
         $this->adapter->insert($table->getTable(), [
-            'string_col' => null
+            'string_col' => null,
         ]);
 
         $this->adapter->insert($table->getTable(), [
-            'int_col' => 23
+            'int_col' => 23,
         ]);
 
         $expectedOutput = <<<'OUTPUT'
@@ -1832,7 +1930,7 @@ INSERT INTO "public"."table1" ("string_col") VALUES (null);
 INSERT INTO "public"."table1" ("int_col") VALUES (23);
 OUTPUT;
         $actualOutput = $consoleOutput->fetch();
-        $this->assertContains(
+        $this->assertStringContainsString(
             $expectedOutput,
             $actualOutput,
             'Passing the --dry-run option doesn\'t dump the insert to the output'
@@ -1877,7 +1975,7 @@ OUTPUT;
 INSERT INTO "public"."table1" ("string_col", "int_col") VALUES ('test_data1', 23), (null, 42);
 OUTPUT;
         $actualOutput = $consoleOutput->fetch();
-        $this->assertContains(
+        $this->assertStringContainsString(
             $expectedOutput,
             $actualOutput,
             'Passing the --dry-run option doesn\'t dump the bulkinsert to the output'
@@ -1908,7 +2006,7 @@ OUTPUT;
         $table = new \Phinx\Db\Table('schema1.table1', [], $this->adapter);
         $table->insert([
             'column1' => 'id1',
-            'column2' => 1
+            'column2' => 1,
         ])->save();
 
         $expectedOutput = <<<'OUTPUT'
@@ -1916,7 +2014,7 @@ CREATE TABLE "schema1"."table1" ("column1" CHARACTER VARYING (255) NOT NULL, "co
 INSERT INTO "schema1"."table1" ("column1", "column2") VALUES ('id1', 1);
 OUTPUT;
         $actualOutput = $consoleOutput->fetch();
-        $this->assertContains($expectedOutput, $actualOutput, 'Passing the --dry-run option does not dump create and then insert table queries to the output');
+        $this->assertStringContainsString($expectedOutput, $actualOutput, 'Passing the --dry-run option does not dump create and then insert table queries to the output');
     }
 
     public function testDumpTransaction()

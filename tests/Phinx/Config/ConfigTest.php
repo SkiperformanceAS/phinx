@@ -2,7 +2,9 @@
 
 namespace Test\Phinx\Config;
 
+use InvalidArgumentException;
 use Phinx\Config\Config;
+use UnexpectedValueException;
 
 /**
  * Class ConfigTest
@@ -11,32 +13,6 @@ use Phinx\Config\Config;
  */
 class ConfigTest extends AbstractConfigTest
 {
-    /**
-     * @covers \Phinx\Config\Config::__construct
-     * @covers \Phinx\Config\Config::getConfigFilePath
-     */
-    public function testConstructEmptyArguments()
-    {
-        $config = new Config([]);
-        // this option is set to its default value when not being passed in the constructor, so we can ignore it
-        unset($config['version_order']);
-        $this->assertAttributeEmpty('values', $config);
-        $this->assertAttributeEmpty('configFilePath', $config);
-        $this->assertNull($config->getConfigFilePath());
-    }
-
-    /**
-     * @covers \Phinx\Config\Config::__construct
-     * @covers \Phinx\Config\Config::getConfigFilePath
-     */
-    public function testConstructByArray()
-    {
-        $config = new Config($this->getConfigArray());
-        $this->assertAttributeNotEmpty('values', $config);
-        $this->assertAttributeEmpty('configFilePath', $config);
-        $this->assertNull($config->getConfigFilePath());
-    }
-
     /**
      * @covers \Phinx\Config\Config::getEnvironments
      */
@@ -97,6 +73,36 @@ class ConfigTest extends AbstractConfigTest
     }
 
     /**
+     * @covers \Phinx\Config\Config::getDataDomain
+     */
+    public function testGetDataDomainMethod()
+    {
+        $config = new Config($this->getConfigArray());
+        $this->assertIsArray($config->getDataDomain());
+    }
+
+    /**
+     * @covers \Phinx\Config\Config::getDataDomain
+     */
+    public function testReturnsEmptyArrayWithEmptyDataDomain()
+    {
+        $config = new Config([]);
+        $this->assertIsArray($config->getDataDomain());
+        $this->assertCount(0, $config->getDataDomain());
+    }
+
+    /**
+     * @covers \Phinx\Config\Config::getDefaultEnvironment
+     */
+    public function testGetDefaultEnvironmentUsingDatabaseKey()
+    {
+        $configArray = $this->getConfigArray();
+        $configArray['environments']['default_database'] = 'production';
+        $config = new Config($configArray);
+        $this->assertEquals('production', $config->getDefaultEnvironment());
+    }
+
+    /**
      * @covers \Phinx\Config\Config::offsetGet
      * @covers \Phinx\Config\Config::offsetSet
      * @covers \Phinx\Config\Config::offsetExists
@@ -114,12 +120,14 @@ class ConfigTest extends AbstractConfigTest
 
     /**
      * @covers \Phinx\Config\Config::offsetGet
-     * @expectedException \InvalidArgumentException
-     * @expectedExceptionMessage Identifier "foo" is not defined.
      */
     public function testUndefinedArrayAccess()
     {
         $config = new Config([]);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Identifier "foo" is not defined.');
+
         $config['foo'];
     }
 
@@ -205,13 +213,15 @@ class ConfigTest extends AbstractConfigTest
 
     /**
      * @covers \Phinx\Config\Config::getSeedPaths
-     * @expectedException \UnexpectedValueException
-     * @expectedExceptionMessage Seeds path missing from config file
      */
     public function testGetSeedPathThrowsException()
     {
         $config = new \Phinx\Config\Config([]);
-        $this->assertEquals('db/seeds', $config->getSeedPaths());
+
+        $this->expectException(UnexpectedValueException::class);
+        $this->expectExceptionMessage('Seeds path missing from config file');
+
+        $config->getSeedPaths();
     }
 
     /**
@@ -275,11 +285,11 @@ class ConfigTest extends AbstractConfigTest
         return [
             'With Creation Time Version Order' =>
             [
-                \Phinx\Config\Config::VERSION_ORDER_CREATION_TIME, true
+                \Phinx\Config\Config::VERSION_ORDER_CREATION_TIME, true,
             ],
             'With Execution Time Version Order' =>
             [
-                \Phinx\Config\Config::VERSION_ORDER_EXECUTION_TIME, false
+                \Phinx\Config\Config::VERSION_ORDER_EXECUTION_TIME, false,
             ],
         ];
     }
@@ -312,5 +322,54 @@ class ConfigTest extends AbstractConfigTest
             unset($_ENV['PHINX_TEST_CONFIG_NAME']);
             unset($_ENV['PHINX_TEST_CONFIG_SUFFIX']);
         }
+    }
+
+    public function testSqliteMemorySetsName()
+    {
+        $config = new \Phinx\Config\Config([
+            'environments' => [
+                'production' => [
+                    'adapter' => 'sqlite',
+                    'memory' => true,
+                ],
+            ],
+        ]);
+        $this->assertSame(
+            ['adapter' => 'sqlite', 'memory' => true, 'name' => ':memory:'],
+            $config->getEnvironment('production')
+        );
+    }
+
+    public function testSqliteMemoryOverridesName()
+    {
+        $config = new \Phinx\Config\Config([
+            'environments' => [
+                'production' => [
+                    'adapter' => 'sqlite',
+                    'memory' => true,
+                    'name' => 'blah',
+                ],
+            ],
+        ]);
+        $this->assertSame(
+            ['adapter' => 'sqlite', 'memory' => true, 'name' => ':memory:'],
+            $config->getEnvironment('production')
+        );
+    }
+
+    public function testSqliteNonBooleanMemory()
+    {
+        $config = new \Phinx\Config\Config([
+            'environments' => [
+                'production' => [
+                    'adapter' => 'sqlite',
+                    'memory' => "yes",
+                ],
+            ],
+        ]);
+        $this->assertSame(
+            ['adapter' => 'sqlite', 'memory' => "yes", 'name' => ':memory:'],
+            $config->getEnvironment('production')
+        );
     }
 }

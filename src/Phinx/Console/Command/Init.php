@@ -16,7 +16,17 @@ use Symfony\Component\Console\Output\OutputInterface;
 
 class Init extends Command
 {
-    const FILE_NAME = 'phinx';
+    protected const FILE_NAME = 'phinx';
+
+    /**
+     * @var string[]
+     */
+    protected static $supportedFormats = [
+        AbstractCommand::FORMAT_JSON,
+        AbstractCommand::FORMAT_YML_ALIAS,
+        AbstractCommand::FORMAT_YML,
+        AbstractCommand::FORMAT_PHP,
+    ];
 
     /**
      * @var string
@@ -31,7 +41,13 @@ class Init extends Command
     protected function configure()
     {
         $this->setDescription('Initialize the application for Phinx')
-            ->addOption('--format', '-f', InputArgument::OPTIONAL, 'What format should we use to initialize?', 'yml')
+            ->addOption(
+                '--format',
+                '-f',
+                InputArgument::OPTIONAL,
+                'What format should we use to initialize?',
+                AbstractCommand::FORMAT_DEFAULT
+            )
             ->addArgument('path', InputArgument::OPTIONAL, 'Which path should we initialize for Phinx?')
             ->setHelp(sprintf(
                 '%sInitializes the application for Phinx%s',
@@ -74,9 +90,9 @@ class Init extends Command
         // get the migration path from the config
         $path = (string)$input->getArgument('path');
 
-        if (!in_array($format, ['yaml', 'yml', 'json', 'php'])) {
+        if (!in_array($format, static::$supportedFormats, true)) {
             throw new InvalidArgumentException(sprintf(
-                'Invalid format "%s". Format must be either yaml, yml, json, or php.',
+                'Invalid format "%s". Format must be either ' . implode(', ', static::$supportedFormats) . '.',
                 $format
             ));
         }
@@ -123,7 +139,7 @@ class Init extends Command
      *
      * @return void
      */
-    protected function writeConfig($path, $format = 'yml')
+    protected function writeConfig($path, $format = AbstractCommand::FORMAT_DEFAULT)
     {
         // Check if dir is writable
         $dirname = dirname($path);
@@ -134,15 +150,13 @@ class Init extends Command
             ));
         }
 
-        if ($format === 'yaml') {
-            $format = 'yml';
+        if ($format === AbstractCommand::FORMAT_YML_ALIAS) {
+            $format = AbstractCommand::FORMAT_YML;
         }
 
         // load the config template
-        if (is_dir(__DIR__ . '/../../../data/Phinx')) {
-            $contents = file_get_contents(__DIR__ . '/../../../data/Phinx/' . self::FILE_NAME . '.' . $format . '.dist');
-        } elseif ($format === 'yml' || $format === 'yaml') {
-            $contents = file_get_contents(__DIR__ . '/../../../../' . self::FILE_NAME . '.yml');
+        if (is_dir(__DIR__ . '/../../../../data')) {
+            $contents = file_get_contents(__DIR__ . '/../../../../data/' . self::FILE_NAME . '.' . $format . '.dist');
         } else {
             throw new RuntimeException(sprintf(
                 'Could not find template for format "%s".',

@@ -2,9 +2,11 @@
 
 namespace Test\Phinx\Db\Adapter;
 
+use BadMethodCallException;
 use Phinx\Db\Adapter\SqlServerAdapter;
 use Phinx\Util\Literal;
 use PHPUnit\Framework\TestCase;
+use RuntimeException;
 use Symfony\Component\Console\Input\ArrayInput;
 use Symfony\Component\Console\Input\InputDefinition;
 use Symfony\Component\Console\Input\InputOption;
@@ -18,30 +20,23 @@ class SqlServerAdapterTest extends TestCase
      */
     private $adapter;
 
-    public function setUp()
+    public function setUp(): void
     {
-        if (!TESTS_PHINX_DB_ADAPTER_SQLSRV_ENABLED) {
-            $this->markTestSkipped('SqlServer tests disabled. See TESTS_PHINX_DB_ADAPTER_SQLSRV_ENABLED constant.');
+        if (!defined('SQLSRV_DB_CONFIG')) {
+            $this->markTestSkipped('SqlServer tests disabled.');
         }
 
-        $options = [
-            'host' => TESTS_PHINX_DB_ADAPTER_SQLSRV_HOST,
-            'name' => TESTS_PHINX_DB_ADAPTER_SQLSRV_DATABASE,
-            'user' => TESTS_PHINX_DB_ADAPTER_SQLSRV_USERNAME,
-            'pass' => TESTS_PHINX_DB_ADAPTER_SQLSRV_PASSWORD,
-            'port' => TESTS_PHINX_DB_ADAPTER_SQLSRV_PORT
-        ];
-        $this->adapter = new SqlServerAdapter($options, new ArrayInput([]), new NullOutput());
+        $this->adapter = new SqlServerAdapter(SQLSRV_DB_CONFIG, new ArrayInput([]), new NullOutput());
 
         // ensure the database is empty for each test
-        $this->adapter->dropDatabase($options['name']);
-        $this->adapter->createDatabase($options['name']);
+        $this->adapter->dropDatabase(SQLSRV_DB_CONFIG['name']);
+        $this->adapter->createDatabase(SQLSRV_DB_CONFIG['name']);
 
         // leave the adapter in a disconnected state for each test
         $this->adapter->disconnect();
     }
 
-    public function tearDown()
+    public function tearDown(): void
     {
         if (!empty($this->adapter)) {
             $this->adapter->disconnect();
@@ -74,13 +69,7 @@ class SqlServerAdapterTest extends TestCase
 
     public function testConnectionWithInvalidCredentials()
     {
-        $options = [
-            'host' => TESTS_PHINX_DB_ADAPTER_SQLSRV_HOST,
-            'name' => TESTS_PHINX_DB_ADAPTER_SQLSRV_DATABASE,
-            'port' => TESTS_PHINX_DB_ADAPTER_SQLSRV_PORT,
-            'user' => 'invaliduser',
-            'pass' => 'invalidpass'
-        ];
+        $options = ['user' => 'invalid', 'pass' => 'invalid'] + SQLSRV_DB_CONFIG;
 
         $adapter = null;
         try {
@@ -154,6 +143,7 @@ class SqlServerAdapterTest extends TestCase
         $this->assertTrue($this->adapter->hasColumn('ntable', 'email'));
         $this->assertFalse($this->adapter->hasColumn('ntable', 'address'));
     }
+
     public function testCreateTableIdentityColumn()
     {
         $table = new \Phinx\Db\Table('ntable', ['id' => false, 'primary_key' => 'id'], $this->adapter);
@@ -170,10 +160,11 @@ WHERE t.name='ntable'");
         $this->assertEquals($identity['seed_value'], '1');
         $this->assertEquals($identity['increment_value'], '10');
     }
+
     public function testCreateTableWithNoPrimaryKey()
     {
         $options = [
-            'id' => false
+            'id' => false,
         ];
         $table = new \Phinx\Db\Table('atable', $options, $this->adapter);
         $table->addColumn('user_id', 'integer')
@@ -181,11 +172,58 @@ WHERE t.name='ntable'");
         $this->assertFalse($this->adapter->hasColumn('atable', 'id'));
     }
 
+    public function testCreateTableWithConflictingPrimaryKeys()
+    {
+        $options = [
+            'primary_key' => 'user_id',
+        ];
+        $table = new \Phinx\Db\Table('atable', $options, $this->adapter);
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('You cannot enable an auto incrementing ID field and a primary key');
+        $table->addColumn('user_id', 'integer')->save();
+    }
+
+    public function testCreateTableWithPrimaryKeySetToImplicitId()
+    {
+        $options = [
+            'primary_key' => 'id',
+        ];
+        $table = new \Phinx\Db\Table('ztable', $options, $this->adapter);
+        $table->addColumn('user_id', 'integer')->save();
+        $this->assertTrue($this->adapter->hasColumn('ztable', 'id'));
+        $this->assertTrue($this->adapter->hasIndex('ztable', 'id'));
+        $this->assertTrue($this->adapter->hasColumn('ztable', 'user_id'));
+    }
+
+    public function testCreateTableWithPrimaryKeyArraySetToImplicitId()
+    {
+        $options = [
+            'primary_key' => ['id'],
+        ];
+        $table = new \Phinx\Db\Table('ztable', $options, $this->adapter);
+        $table->addColumn('user_id', 'integer')->save();
+        $this->assertTrue($this->adapter->hasColumn('ztable', 'id'));
+        $this->assertTrue($this->adapter->hasIndex('ztable', 'id'));
+        $this->assertTrue($this->adapter->hasColumn('ztable', 'user_id'));
+    }
+
+    public function testCreateTableWithMultiplePrimaryKeyArraySetToImplicitId()
+    {
+        $options = [
+            'primary_key' => ['id', 'user_id'],
+        ];
+        $table = new \Phinx\Db\Table('ztable', $options, $this->adapter);
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('You cannot enable an auto incrementing ID field and a primary key');
+        $table->addColumn('user_id', 'integer')->save();
+    }
+
     public function testCreateTableWithMultiplePrimaryKeys()
     {
         $options = [
             'id' => false,
-            'primary_key' => ['user_id', 'tag_id']
+            'primary_key' => ['user_id', 'tag_id'],
         ];
         $table = new \Phinx\Db\Table('table1', $options, $this->adapter);
         $table->addColumn('user_id', 'integer')
@@ -194,6 +232,34 @@ WHERE t.name='ntable'");
         $this->assertTrue($this->adapter->hasIndex('table1', ['user_id', 'tag_id']));
         $this->assertTrue($this->adapter->hasIndex('table1', ['tag_id', 'USER_ID']));
         $this->assertFalse($this->adapter->hasIndex('table1', ['tag_id', 'user_email']));
+    }
+
+    public function testCreateTableWithPrimaryKeyAsUuid()
+    {
+        $options = [
+            'id' => false,
+            'primary_key' => 'id',
+        ];
+        $table = new \Phinx\Db\Table('ztable', $options, $this->adapter);
+        $table->addColumn('id', 'uuid')->save();
+        $table->addColumn('user_id', 'integer')->save();
+        $this->assertTrue($this->adapter->hasColumn('ztable', 'id'));
+        $this->assertTrue($this->adapter->hasIndex('ztable', 'id'));
+        $this->assertTrue($this->adapter->hasColumn('ztable', 'user_id'));
+    }
+
+    public function testCreateTableWithPrimaryKeyAsBinaryUuid()
+    {
+        $options = [
+            'id' => false,
+            'primary_key' => 'id',
+        ];
+        $table = new \Phinx\Db\Table('ztable', $options, $this->adapter);
+        $table->addColumn('id', 'binaryuuid')->save();
+        $table->addColumn('user_id', 'integer')->save();
+        $this->assertTrue($this->adapter->hasColumn('ztable', 'id'));
+        $this->assertTrue($this->adapter->hasIndex('ztable', 'id'));
+        $this->assertTrue($this->adapter->hasColumn('ztable', 'user_id'));
     }
 
     public function testCreateTableWithMultipleIndexes()
@@ -276,13 +342,12 @@ WHERE t.name='ntable'");
         $this->assertFalse($this->adapter->hasPrimaryKey('table1', ['column1']));
     }
 
-    /**
-     * @expectedException \BadMethodCallException
-     */
     public function testChangeCommentFails()
     {
         $table = new \Phinx\Db\Table('table1', [], $this->adapter);
         $table->save();
+
+        $this->expectException(BadMethodCallException::class);
 
         $table
             ->changeComment('comment1')
@@ -318,7 +383,7 @@ WHERE t.name='ntable'");
               ->save();
         $columns = $this->adapter->getColumns('table1');
         foreach ($columns as $column) {
-            if ($column->getName() == 'default_zero') {
+            if ($column->getName() === 'default_zero') {
                 $this->assertEquals("test", $column->getDefault());
             }
         }
@@ -332,7 +397,7 @@ WHERE t.name='ntable'");
               ->save();
         $columns = $this->adapter->getColumns('table1');
         foreach ($columns as $column) {
-            if ($column->getName() == 'default_zero') {
+            if ($column->getName() === 'default_zero') {
                 $this->assertNotNull($column->getDefault());
                 $this->assertEquals('0', $column->getDefault());
             }
@@ -347,7 +412,7 @@ WHERE t.name='ntable'");
             ->save();
         $columns = $this->adapter->getColumns('table1');
         foreach ($columns as $column) {
-            if ($column->getName() == 'default_null') {
+            if ($column->getName() === 'default_null') {
                 $this->assertNull($column->getDefault());
             }
         }
@@ -363,10 +428,10 @@ WHERE t.name='ntable'");
             ->save();
         $columns = $this->adapter->getColumns('table1');
         foreach ($columns as $column) {
-            if ($column->getName() == 'default_false') {
+            if ($column->getName() === 'default_false') {
                 $this->assertSame(0, $column->getDefault());
             }
-            if ($column->getName() == 'default_true') {
+            if ($column->getName() === 'default_true') {
                 $this->assertSame(1, $column->getDefault());
             }
         }
@@ -415,7 +480,7 @@ WHERE t.name='ntable'");
         $this->assertTrue($this->adapter->hasColumn('t', 'column1'));
         $columns = $this->adapter->getColumns('t');
         foreach ($columns as $column) {
-            if ($column->getName() == 'column1') {
+            if ($column->getName() === 'column1') {
                 $this->assertEquals('string', $column->getType());
             }
         }
@@ -435,7 +500,7 @@ WHERE t.name='ntable'");
         $this->assertTrue($this->adapter->hasColumn('t', 'column2'));
         $columns = $this->adapter->getColumns('t');
         foreach ($columns as $column) {
-            if ($column->getName() == 'column2') {
+            if ($column->getName() === 'column2') {
                 $this->assertTrue($column->isNull());
             }
         }
@@ -674,7 +739,7 @@ WHERE t.name='ntable'");
     public function testHasDatabase()
     {
         $this->assertFalse($this->adapter->hasDatabase('fake_database_name'));
-        $this->assertTrue($this->adapter->hasDatabase(TESTS_PHINX_DB_ADAPTER_SQLSRV_DATABASE));
+        $this->assertTrue($this->adapter->hasDatabase(SQLSRV_DB_CONFIG['name']));
     }
 
     public function testDropDatabase()
@@ -685,12 +750,11 @@ WHERE t.name='ntable'");
         $this->adapter->dropDatabase('phinx_temp_database');
     }
 
-    /**
-     * @expectedException \RuntimeException
-     * @expectedExceptionMessage Column type "idontexist" is not supported by SqlServer.
-     */
     public function testInvalidSqlType()
     {
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Column type "idontexist" is not supported by SqlServer.');
+
         $this->adapter->getSqlType('idontexist');
     }
 
@@ -776,10 +840,10 @@ WHERE t.name='ntable'");
         $userId = 'user';
         $sessionId = 'session';
 
-        $local = new \Phinx\Db\Table('users', ['primary_key' => $userId, 'id' => $userId], $this->adapter);
+        $local = new \Phinx\Db\Table('users', ['id' => $userId], $this->adapter);
         $local->create();
 
-        $foreign = new \Phinx\Db\Table('sessions', ['primary_key' => $sessionId, 'id' => $sessionId], $this->adapter);
+        $foreign = new \Phinx\Db\Table('sessions', ['id' => $sessionId], $this->adapter);
         $foreign->addColumn('user', 'integer')
                 ->addForeignKey('user', 'users', $userId)
                 ->create();
@@ -801,7 +865,7 @@ WHERE t.name='ntable'");
                   [
                       'column1' => 'value2',
                       'column2' => 2,
-                  ]
+                  ],
               ])
               ->insert(
                   [
@@ -835,7 +899,7 @@ WHERE t.name='ntable'");
                   [
                       'column1' => 'value2',
                       'column2' => 2,
-                  ]
+                  ],
               ])
               ->insert(
                   [
@@ -868,7 +932,7 @@ WHERE t.name='ntable'");
                   [
                       'column1' => 'value2',
                       'column2' => 2,
-                  ]
+                  ],
               ])
               ->save();
 
@@ -898,7 +962,7 @@ WHERE t.name='ntable'");
         $table = new \Phinx\Db\Table('table1', [], $this->adapter);
         $table->insert([
             'column1' => 'id1',
-            'column2' => 1
+            'column2' => 1,
         ])->save();
 
         $expectedOutput = <<<'OUTPUT'
@@ -906,7 +970,7 @@ CREATE TABLE [table1] ([column1] NVARCHAR (255)   NOT NULL , [column2] INT   NOT
 INSERT INTO [table1] ([column1], [column2]) VALUES ('id1', 1);
 OUTPUT;
         $actualOutput = str_replace("\r\n", "\n", $consoleOutput->fetch());
-        $this->assertContains($expectedOutput, $actualOutput, 'Passing the --dry-run option does not dump create and then insert table queries to the output');
+        $this->assertStringContainsString($expectedOutput, $actualOutput, 'Passing the --dry-run option does not dump create and then insert table queries to the output');
     }
 
     public function testDumpTransaction()

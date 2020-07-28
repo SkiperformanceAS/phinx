@@ -38,11 +38,12 @@ class Test extends AbstractCommand
         $this->setDescription('Verify the configuration file')
             ->setHelp(
                 <<<EOT
-The <info>test</info> command verifies the YAML configuration file and optionally an environment
+The <info>test</info> command is used to verify the phinx configuration file and optionally an environment
 
 <info>phinx test</info>
 <info>phinx test -e development</info>
 
+If the environment option is set, it will test that phinx can connect to the DB associated with that environment
 EOT
             );
     }
@@ -50,8 +51,8 @@ EOT
     /**
      * Verify configuration file
      *
-     * @param \Symfony\Component\Console\Input\InputInterface $input
-     * @param \Symfony\Component\Console\Output\OutputInterface $output
+     * @param \Symfony\Component\Console\Input\InputInterface $input Input
+     * @param \Symfony\Component\Console\Output\OutputInterface $output Output
      *
      * @throws \InvalidArgumentException
      *

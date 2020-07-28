@@ -40,7 +40,7 @@ This means that:
 
     return [
         'environments' => [
-            'default_database' => 'development',
+            'default_environment' => 'development',
             'development' => [
                 'name' => 'devdb',
                 'connection' => $pdo
@@ -57,10 +57,10 @@ The first option specifies the path to your migration directory. Phinx uses
 .. note::
 
     ``%%PHINX_CONFIG_DIR%%`` is a special token and is automatically replaced
-    with the root directory where your ``phinx.yml`` file is stored.
+    with the root directory where your phinx configuration file is stored.
 
 In order to overwrite the default ``%%PHINX_CONFIG_DIR%%/db/migrations``, you
-need to add the following to the yaml configuration.
+need to add the following to the configuration.
 
 .. code-block:: yaml
 
@@ -112,7 +112,7 @@ The second option specifies the path to your seed directory. Phinx uses
 .. note::
 
     ``%%PHINX_CONFIG_DIR%%`` is a special token and is automatically replaced
-    with the root directory where your ``phinx.yml`` file is stored.
+    with the root directory where your configuration file is stored.
 
 In order to overwrite the default ``%%PHINX_CONFIG_DIR%%/db/seeds``, you
 need to add the following to the yaml configuration.
@@ -139,6 +139,17 @@ You can also use the ``%%PHINX_CONFIG_DIR%%`` token in your path.
     paths:
         seeds: '%%PHINX_CONFIG_DIR%%/your/relative/path'
 
+Custom Seeder Base
+---------------------
+
+By default all seeders will extend from Phinx's `AbstractSeed` class.
+This can be set to a custom class that extends from `AbstractSeed` by
+setting ``seeder_base_class`` in your config:
+
+.. code-block:: yaml
+
+    seeder_base_class: MyMagicalSeeder
+
 Environments
 ------------
 
@@ -151,7 +162,7 @@ specified under the ``environments`` nested collection. For example:
 
     environments:
         default_migration_table: phinxlog
-        default_database: development
+        default_environment: development
         production:
             adapter: mysql
             host: localhost
@@ -175,6 +186,23 @@ file:
 
     export PHINX_ENVIRONMENT=dev-`whoami`-`hostname`
 
+Migration Table
+---------------
+
+To keep track of the migration statuses for an environment, phinx creates
+a table to store this information. You can customize where this table
+is created by configuring ``default_migration_table``:
+
+.. code-block:: yaml
+
+    environment:
+        default_migration_table: phinxlog
+
+If this field is omitted, then it will default to ``phinxlog``. For
+databases that support it, e.g. Postgres, the schema name can be prefixed
+with a period separator (``.``). For example, ``phinx.log`` will create
+the table ``log`` in the ``phinx`` schema instead of ``phinxlog`` in the
+``public`` (default) schema.
 
 Table Prefix and Suffix
 -----------------------
@@ -204,7 +232,7 @@ network connections. The socket path is configured with ``unix_socket``:
 
     environments:
         default_migration_table: phinxlog
-        default_database: development
+        default_environment: development
         production:
             adapter: mysql
             name: production_db
@@ -228,7 +256,7 @@ demonstrated by the following example:
 
     environments:
         default_migration_table: phinxlog
-        default_database: development
+        default_environment: development
         production:
             adapter: mysql
             host: '%%PHINX_DBHOST%%'
@@ -261,7 +289,7 @@ projects (Doctrine, Rails, AMQP, PaaS, etc).
 
     environments:
         default_migration_table: phinxlog
-        default_database: development
+        default_environment: development
         production:
             # Example data source name
             dsn: mysql://root@localhost:3306/mydb?charset=utf8
@@ -274,7 +302,7 @@ specified directly as connection options.
 
     environments:
         default_migration_table: phinxlog
-        default_database: development
+        default_environment: development
         development:
             dsn: %%DATABASE_URL%%
         production:

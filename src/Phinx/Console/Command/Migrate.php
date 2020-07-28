@@ -53,8 +53,8 @@ EOT
     /**
      * Migrate the database.
      *
-     * @param \Symfony\Component\Console\Input\InputInterface $input
-     * @param \Symfony\Component\Console\Output\OutputInterface $output
+     * @param \Symfony\Component\Console\Input\InputInterface $input Input
+     * @param \Symfony\Component\Console\Output\OutputInterface $output Output
      *
      * @return int integer 0 on success, or an error code.
      */
@@ -117,6 +117,9 @@ EOT
             if ($date !== null) {
                 $this->getManager()->migrateToDateTime($environment, new DateTime($date), $fake);
             } else {
+                if ($version) {
+                    $version = (int)$version;
+                }
                 $this->getManager()->migrate($environment, $version, $fake);
             }
             $end = microtime(true);

@@ -16,14 +16,7 @@ class TableTest extends TestCase
     public function provideTimestampColumnNames()
     {
         $result = [];
-        $adapters = array_filter(
-            [
-                TESTS_PHINX_DB_ADAPTER_SQLSRV_ENABLED ? new SqlServerAdapter([]) : false,
-                TESTS_PHINX_DB_ADAPTER_MYSQL_ENABLED ? new MysqlAdapter([]) : false,
-                TESTS_PHINX_DB_ADAPTER_POSTGRES_ENABLED ? new PostgresAdapter([]) : false,
-                TESTS_PHINX_DB_ADAPTER_SQLITE_ENABLED ? new SQLiteAdapter([]) : false,
-            ]
-        );
+        $adapters = [new SqlServerAdapter([]), new MysqlAdapter([]), new PostgresAdapter([]), new SQLiteAdapter([])];
         foreach ($adapters as $adapter) {
             $result = array_merge(
                 $result,
@@ -138,7 +131,7 @@ class TableTest extends TestCase
         $this->assertEquals($expectedUpdatedAtColumnName, $columns[1]->getName());
         $this->assertEquals('timestamp', $columns[1]->getType());
         $this->assertEquals($withTimezone, $columns[1]->getTimezone());
-        $this->assertEquals('', $columns[1]->getUpdate());
+        $this->assertEquals('CURRENT_TIMESTAMP', $columns[1]->getUpdate());
         $this->assertTrue($columns[1]->isNull());
         $this->assertNull($columns[1]->getDefault());
     }
@@ -174,7 +167,7 @@ class TableTest extends TestCase
         $this->assertEquals($expectedUpdatedAtColumnName, $columns[1]->getName());
         $this->assertEquals('timestamp', $columns[1]->getType());
         $this->assertEquals(true, $columns[1]->getTimezone());
-        $this->assertEquals('', $columns[1]->getUpdate());
+        $this->assertEquals('CURRENT_TIMESTAMP', $columns[1]->getUpdate());
         $this->assertTrue($columns[1]->isNull());
         $this->assertNull($columns[1]->getDefault());
     }
@@ -210,7 +203,7 @@ class TableTest extends TestCase
             2 => [
                 'column1' => 'value1',
                 'column2' => 'value2',
-            ]
+            ],
         ];
         $table->insert($data);
         $expectedData = array_values($data);
@@ -343,7 +336,7 @@ class TableTest extends TestCase
         $adapterStub->expects($this->exactly(2))
             ->method('getColumns')
             ->willReturn([
-                $column1
+                $column1,
             ]);
 
         $table = new \Phinx\Db\Table('ntable', [], $adapterStub);
@@ -379,16 +372,16 @@ class TableTest extends TestCase
         return [
             [
                 'indexA',
-                (new Index())->setColumns(['indexA'])
+                (new Index())->setColumns(['indexA']),
             ],
             [
                 ['indexB', 'indexC'],
-                (new Index())->setColumns(['indexB', 'indexC'])
+                (new Index())->setColumns(['indexB', 'indexC']),
             ],
             [
                 ['indexD'],
-                (new Index())->setColumns(['indexD'])
-            ]
+                (new Index())->setColumns(['indexD']),
+            ],
         ];
     }
 

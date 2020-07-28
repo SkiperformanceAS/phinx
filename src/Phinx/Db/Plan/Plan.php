@@ -89,7 +89,7 @@ class Plan
     /**
      * Parses the given Intent and creates the separate steps to execute
      *
-     * @param \Phinx\Db\Plan\Intent $actions The actions to use for the plan
+     * @param \Phinx\Db\Action\Action[] $actions The actions to use for the plan
      *
      * @return void
      */
@@ -214,7 +214,7 @@ class Plan
             // but it is a conflicting action. Luckily solving the conflict can be done by moving
             // the ChangeColumn action to another AlterTable
             ->unfold(new ActionSplitter(RenameColumn::class, ChangeColumn::class, function (RenameColumn $a, ChangeColumn $b) {
-                return $a->getNewName() == $b->getColumnName();
+                return $a->getNewName() === $b->getColumnName();
             }))
             ->toList();
 
@@ -369,7 +369,7 @@ class Plan
                         if (!$action instanceof RemoveColumn) {
                             return [$action, null];
                         }
-                        if (in_array($action->getColumn(), $columns)) {
+                        if (in_array($action->getColumn()->getName(), $columns, true)) {
                             return [null, $action];
                         }
 

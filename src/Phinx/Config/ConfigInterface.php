@@ -32,7 +32,7 @@ interface ConfigInterface extends ArrayAccess
      * This method returns <code>null</code> if the specified environment
      * doesn't exist.
      *
-     * @param string $name
+     * @param string $name Environment Name
      *
      * @return array|null
      */
@@ -59,7 +59,7 @@ interface ConfigInterface extends ArrayAccess
     /**
      * Get the aliased value from a supplied alias.
      *
-     * @param string $alias
+     * @param string $alias Alias
      *
      * @return string|null
      */
@@ -108,6 +108,20 @@ interface ConfigInterface extends ArrayAccess
     public function getTemplateClass();
 
     /**
+     * Get the user-provided container for instantiating seeds
+     *
+     * @return \Psr\Container\ContainerInterface|null
+     */
+    public function getContainer();
+
+    /**
+     * Get the data domain array.
+     *
+     * @return array
+     */
+    public function getDataDomain();
+
+    /**
      * Get the version order.
      *
      * @return string
@@ -136,4 +150,12 @@ interface ConfigInterface extends ArrayAccess
      * @return string
      */
     public function getMigrationBaseClassName($dropNamespace = true);
+
+    /**
+     * Gets the base class name for seeders.
+     *
+     * @param bool $dropNamespace Return the base seeder class name without the namespace.
+     * @return string
+     */
+    public function getSeedBaseClassName($dropNamespace = true);
 }

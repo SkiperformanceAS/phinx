@@ -34,28 +34,35 @@ abstract class AbstractConfigTest extends TestCase
                 'paths' => [
                     'migrations' => '%%PHINX_CONFIG_PATH%%/testmigrations2',
                     'seeds' => '%%PHINX_CONFIG_PATH%%/db/seeds',
-                ]
+                ],
             ],
             'paths' => [
                 'migrations' => $this->getMigrationPaths(),
-                'seeds' => $this->getSeedPaths()
+                'seeds' => $this->getSeedPaths(),
             ],
             'templates' => [
                 'file' => '%%PHINX_CONFIG_PATH%%/tpl/testtemplate.txt',
-                'class' => '%%PHINX_CONFIG_PATH%%/tpl/testtemplate.php'
+                'class' => '%%PHINX_CONFIG_PATH%%/tpl/testtemplate.php',
             ],
             'environments' => [
                 'default_migration_table' => 'phinxlog',
-                'default_database' => 'testing',
+                'default_environment' => 'testing',
                 'testing' => [
                     'adapter' => 'sqllite',
                     'wrapper' => 'testwrapper',
-                    'path' => '%%PHINX_CONFIG_PATH%%/testdb/test.db'
+                    'path' => '%%PHINX_CONFIG_PATH%%/testdb/test.db',
                 ],
                 'production' => [
-                    'adapter' => 'mysql'
-                ]
-            ]
+                    'adapter' => 'mysql',
+                ],
+            ],
+            'data_domain' => [
+                'phone_number' => [
+                    'type' => 'string',
+                    'null' => true,
+                    'length' => 15,
+                ],
+            ],
         ];
     }
 

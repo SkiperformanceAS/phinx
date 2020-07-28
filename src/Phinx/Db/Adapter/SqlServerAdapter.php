@@ -29,9 +29,28 @@ use RuntimeException;
  */
 class SqlServerAdapter extends PdoAdapter
 {
+    /**
+     * @var string[]
+     */
+    protected static $specificColumnTypes = [
+        self::PHINX_TYPE_FILESTREAM,
+        self::PHINX_TYPE_BINARYUUID,
+    ];
+
+    /**
+     * @var string
+     */
     protected $schema = 'dbo';
 
-    protected $signedColumnTypes = ['integer' => true, 'biginteger' => true, 'float' => true, 'decimal' => true];
+    /**
+     * @var bool[]
+     */
+    protected $signedColumnTypes = [
+        self::PHINX_TYPE_INTEGER => true,
+        self::PHINX_TYPE_BIG_INTEGER => true,
+        self::PHINX_TYPE_FLOAT => true,
+        self::PHINX_TYPE_DECIMAL => true,
+    ];
 
     /**
      * {@inheritDoc}
@@ -52,13 +71,12 @@ class SqlServerAdapter extends PdoAdapter
 
             $options = $this->getOptions();
 
+            $dsn = 'sqlsrv:server=' . $options['host'];
             // if port is specified use it, otherwise use the SqlServer default
-            if (empty($options['port'])) {
-                $dsn = 'sqlsrv:server=' . $options['host'] . ';database=' . $options['name'];
-            } else {
-                $dsn = 'sqlsrv:server=' . $options['host'] . ',' . $options['port'] . ';database=' . $options['name'];
+            if (!empty($options['port'])) {
+                $dsn .= ',' . $options['port'];
             }
-            $dsn .= ';MultipleActiveResultSets=false';
+            $dsn .= ';database=' . $options['name'] . ';MultipleActiveResultSets=false';
 
             $driverOptions = [];
 
@@ -128,9 +146,7 @@ class SqlServerAdapter extends PdoAdapter
     }
 
     /**
-     * {@inheritDoc}
-     *
-     * @return void
+     * @inheritDoc
      */
     public function disconnect()
     {
@@ -146,9 +162,7 @@ class SqlServerAdapter extends PdoAdapter
     }
 
     /**
-     * {@inheritDoc}
-     *
-     * @return void
+     * @inheritDoc
      */
     public function beginTransaction()
     {
@@ -156,9 +170,7 @@ class SqlServerAdapter extends PdoAdapter
     }
 
     /**
-     * {@inheritDoc}
-     *
-     * @return void
+     * @inheritDoc
      */
     public function commitTransaction()
     {
@@ -166,9 +178,7 @@ class SqlServerAdapter extends PdoAdapter
     }
 
     /**
-     * {@inheritDoc}
-     *
-     * @return void
+     * @inheritDoc
      */
     public function rollbackTransaction()
     {
@@ -206,9 +216,7 @@ class SqlServerAdapter extends PdoAdapter
     }
 
     /**
-     * {@inheritDoc}
-     *
-     * @return void
+     * @inheritDoc
      */
     public function createTable(Table $table, array $columns = [], array $indexes = [])
     {
@@ -227,6 +235,9 @@ class SqlServerAdapter extends PdoAdapter
                    ->setIdentity(true);
 
             array_unshift($columns, $column);
+            if (isset($options['primary_key']) && (array)$options['id'] !== (array)$options['primary_key']) {
+                throw new InvalidArgumentException('You cannot enable an auto incrementing ID field and a primary key');
+            }
             $options['primary_key'] = $options['id'];
         }
 
@@ -318,15 +329,15 @@ class SqlServerAdapter extends PdoAdapter
     }
 
     /**
-     * {@inheritDoc}
+     * @inheritDoc
+     *
+     * SqlServer does not implement this functionality, and so will always throw an exception if used.
      *
      * @throws \BadMethodCallException
-     *
-     * @return void
      */
     protected function getChangeCommentInstructions(Table $table, $newComment)
     {
-        throw new BadMethodCallException('SQLite does not have table comments');
+        throw new BadMethodCallException('SqlServer does not have table comments');
     }
 
     /**
@@ -382,9 +393,7 @@ class SqlServerAdapter extends PdoAdapter
     }
 
     /**
-     * {@inheritDoc}
-     *
-     * @return void
+     * @inheritDoc
      */
     public function truncateTable($tableName)
     {
@@ -396,6 +405,12 @@ class SqlServerAdapter extends PdoAdapter
         $this->execute($sql);
     }
 
+    /**
+     * @param string $tableName Table name
+     * @param string $columnName Column name
+     *
+     * @return string|false
+     */
     public function getColumnComment($tableName, $columnName)
     {
         $sql = sprintf("SELECT cast(extended_properties.[value] as nvarchar(4000)) comment
@@ -462,17 +477,22 @@ class SqlServerAdapter extends PdoAdapter
         return $columns;
     }
 
+    /**
+     * @param string $default Default
+     *
+     * @return int|string|null
+     */
     protected function parseDefault($default)
     {
-        $default = preg_replace(["/\('(.*)'\)/", "/\(\((.*)\)\)/", "/\((.*)\)/"], '$1', $default);
+        $result = preg_replace(["/\('(.*)'\)/", "/\(\((.*)\)\)/", "/\((.*)\)/"], '$1', $default);
 
-        if (strtoupper($default) === 'NULL') {
-            $default = null;
-        } elseif (is_numeric($default)) {
-            $default = (int)$default;
+        if (strtoupper($result) === 'NULL') {
+            $result = null;
+        } elseif (is_numeric($result)) {
+            $result = (int)$result;
         }
 
-        return $default;
+        return $result;
     }
 
     /**
@@ -636,7 +656,10 @@ SQL;
     }
 
     /**
-     * @inheritDoc
+     * @param string $tableName Table name
+     * @param string|null $columnName Column name
+     *
+     * @return \Phinx\Db\Util\AlterInstructions
      */
     protected function getDropDefaultConstraint($tableName, $columnName)
     {
@@ -649,6 +672,12 @@ SQL;
         return $this->getDropForeignKeyInstructions($tableName, $defaultConstraint);
     }
 
+    /**
+     * @param string $tableName Table name
+     * @param string $columnName Column name
+     *
+     * @return string|false
+     */
     protected function getDefaultConstraint($tableName, $columnName)
     {
         $sql = "SELECT
@@ -678,6 +707,12 @@ WHERE
         return empty($rows) ? false : $rows[0]['name'];
     }
 
+    /**
+     * @param int $tableId Table ID
+     * @param int $indexId Index ID
+     *
+     * @return array
+     */
     protected function getIndexColums($tableId, $indexId)
     {
         $sql = "SELECT AC.[name] AS [column_name]
@@ -698,7 +733,7 @@ ORDER BY IC.[key_ordinal];";
     /**
      * Get an array of indexes from a particular table.
      *
-     * @param string $tableName Table Name
+     * @param string $tableName Table name
      *
      * @return array
      */
@@ -844,20 +879,20 @@ ORDER BY T.[name], I.[index_id];";
 
         if ($constraint) {
             return ($primaryKey['constraint'] === $constraint);
-        } else {
-            if (is_string($columns)) {
-                $columns = [$columns]; // str to array
-            }
-            $missingColumns = array_diff($columns, $primaryKey['columns']);
-
-            return empty($missingColumns);
         }
+
+        if (is_string($columns)) {
+            $columns = [$columns]; // str to array
+        }
+        $missingColumns = array_diff($columns, $primaryKey['columns']);
+
+        return empty($missingColumns);
     }
 
     /**
      * Get the primary key from a particular table.
      *
-     * @param string $tableName Table Name
+     * @param string $tableName Table name
      *
      * @return array
      */
@@ -902,22 +937,22 @@ ORDER BY T.[name], I.[index_id];";
             }
 
             return false;
-        } else {
-            foreach ($foreignKeys as $key) {
-                $a = array_diff($columns, $key['columns']);
-                if (empty($a)) {
-                    return true;
-                }
-            }
-
-            return false;
         }
+
+        foreach ($foreignKeys as $key) {
+            $a = array_diff($columns, $key['columns']);
+            if (empty($a)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
      * Get an array of foreign keys from a particular table.
      *
-     * @param string $tableName Table Name
+     * @param string $tableName Table name
      *
      * @return array
      */
@@ -1044,6 +1079,7 @@ ORDER BY T.[name], I.[index_id];";
                 return ['name' => 'varbinary'];
             case static::PHINX_TYPE_BOOLEAN:
                 return ['name' => 'bit'];
+            case static::PHINX_TYPE_BINARYUUID:
             case static::PHINX_TYPE_UUID:
                 return ['name' => 'uniqueidentifier'];
             case static::PHINX_TYPE_FILESTREAM:
@@ -1091,6 +1127,8 @@ ORDER BY T.[name], I.[index_id];";
             case 'numeric':
             case 'money':
                 return static::PHINX_TYPE_DECIMAL;
+            case 'tinyint':
+                return static::PHINX_TYPE_TINY_INTEGER;
             case 'smallint':
                 return static::PHINX_TYPE_SMALL_INTEGER;
             case 'bigint':
@@ -1121,9 +1159,7 @@ ORDER BY T.[name], I.[index_id];";
     }
 
     /**
-     * {@inheritDoc}
-     *
-     * @return void
+     * @inheritDoc
      */
     public function createDatabase($name, $options = [])
     {
@@ -1151,9 +1187,7 @@ ORDER BY T.[name], I.[index_id];";
     }
 
     /**
-     * {@inheritDoc}
-     *
-     * @return void
+     * @inheritDoc
      */
     public function dropDatabase($name)
     {
@@ -1277,7 +1311,7 @@ SQL;
      */
     public function getColumnTypes()
     {
-        return array_merge(parent::getColumnTypes(), ['filestream']);
+        return array_merge(parent::getColumnTypes(), static::$specificColumnTypes);
     }
 
     /**
@@ -1285,8 +1319,8 @@ SQL;
      *
      * @param \Phinx\Migration\MigrationInterface $migration Migration
      * @param string $direction Direction
-     * @param int $startTime Start Time
-     * @param int $endTime End Time
+     * @param string $startTime Start Time
+     * @param string $endTime End Time
      *
      * @return \Phinx\Db\Adapter\AdapterInterface
      */
@@ -1312,12 +1346,7 @@ SQL;
         ] + $options;
 
         $driver = new SqlServerDriver($options);
-
-        if (method_exists($driver, 'setConnection')) {
-            $driver->setConnection($this->connection);
-        } else {
-            $driver->connection($this->connection);
-        }
+        $driver->setConnection($this->connection);
 
         return new Connection(['driver' => $driver] + $options);
     }

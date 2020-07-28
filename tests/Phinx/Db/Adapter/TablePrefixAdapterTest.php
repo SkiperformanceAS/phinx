@@ -32,7 +32,7 @@ class TablePrefixAdapterTest extends TestCase
      */
     private $mock;
 
-    public function setUp()
+    public function setUp(): void
     {
         $options = [
             'table_prefix' => 'pre_',
@@ -54,10 +54,22 @@ class TablePrefixAdapterTest extends TestCase
                 return $options[$option];
             }));
 
+        $this->mock
+            ->expects($this->any())
+            ->method('getColumnForType')
+            ->will($this->returnCallback(function ($name, $type, $options) {
+                $col = new Column();
+                $col->setName($name);
+                $col->setType($type);
+                $col->setOptions($options);
+
+                return $col;
+            }));
+
         $this->adapter = new TablePrefixAdapter($this->mock);
     }
 
-    public function tearDown()
+    public function tearDown(): void
     {
         unset($this->adapter);
         unset($this->mock);
@@ -88,7 +100,7 @@ class TablePrefixAdapterTest extends TestCase
             ->method('createTable')
             ->with($this->callback(
                 function ($table) {
-                    return $table->getName() == 'pre_table_suf';
+                    return $table->getName() === 'pre_table_suf';
                 }
             ));
 
@@ -185,7 +197,7 @@ class TablePrefixAdapterTest extends TestCase
             ->method('addColumn')
             ->with($this->callback(
                 function ($table) {
-                    return $table->getName() == 'pre_table_suf';
+                    return $table->getName() === 'pre_table_suf';
                 },
                 $this->equalTo($column)
             ));
@@ -323,7 +335,7 @@ class TablePrefixAdapterTest extends TestCase
             ->method('addForeignKey')
             ->with($this->callback(
                 function ($table) {
-                    return $table->getName() == 'pre_table_suf';
+                    return $table->getName() === 'pre_table_suf';
                 },
                 $this->equalTo($foreignKey)
             ));
@@ -357,7 +369,7 @@ class TablePrefixAdapterTest extends TestCase
             ->method('bulkinsert')
             ->with($this->callback(
                 function ($table) {
-                    return $table->getName() == 'pre_table_suf';
+                    return $table->getName() === 'pre_table_suf';
                 },
                 $this->equalTo($row)
             ));

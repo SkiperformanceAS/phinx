@@ -12,19 +12,21 @@ use InvalidArgumentException;
 use Phinx\Config\Config;
 use Phinx\Config\ConfigInterface;
 use Phinx\Config\NamespaceAwareInterface;
+use Phinx\Console\Command\AbstractCommand;
 use Phinx\Migration\Manager\Environment;
 use Phinx\Seed\AbstractSeed;
 use Phinx\Seed\SeedInterface;
 use Phinx\Util\Util;
+use Psr\Container\ContainerInterface;
 use RuntimeException;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 
 class Manager
 {
-    const BREAKPOINT_TOGGLE = 1;
-    const BREAKPOINT_SET = 2;
-    const BREAKPOINT_UNSET = 3;
+    public const BREAKPOINT_TOGGLE = 1;
+    public const BREAKPOINT_SET = 2;
+    public const BREAKPOINT_UNSET = 3;
 
     /**
      * @var \Phinx\Config\ConfigInterface
@@ -42,19 +44,24 @@ class Manager
     protected $output;
 
     /**
-     * @var array
+     * @var \Phinx\Migration\Manager\Environment[]
      */
-    protected $environments;
+    protected $environments = [];
 
     /**
-     * @var array
+     * @var \Phinx\Migration\AbstractMigration[]|null
      */
     protected $migrations;
 
     /**
-     * @var array
+     * @var \Phinx\Seed\AbstractSeed[]|null
      */
     protected $seeds;
+
+    /**
+     * @var \Psr\Container\ContainerInterface
+     */
+    protected $container;
 
     /**
      * @param \Phinx\Config\ConfigInterface $config Configuration Object
@@ -93,7 +100,7 @@ class Manager
             $output->setVerbosity(OutputInterface::VERBOSITY_QUIET);
         }
         if (count($migrations)) {
-            // TODO - rewrite using Symfony Table Helper as we already have this library
+            // rewrite using Symfony Table Helper as we already have this library
             // included and it will fix formatting issues (e.g drawing the lines)
             $output->writeln('');
 
@@ -124,6 +131,7 @@ class Manager
             $hasMissingMigration = !empty($missingVersions);
 
             // get the migrations sorted in the same way as the versions
+            /** @var \Phinx\Migration\AbstractMigration[] $sortedMigrations */
             $sortedMigrations = [];
 
             foreach ($versions as $versionCreationTime => $version) {
@@ -162,7 +170,8 @@ class Manager
                         } else {
                             if ($missingVersion['start_time'] > $version['start_time']) {
                                 break;
-                            } elseif ($missingVersion['start_time'] == $version['start_time'] &&
+                            } elseif (
+                                $missingVersion['start_time'] == $version['start_time'] &&
                                 $missingVersion['version'] > $version['version']
                             ) {
                                 break;
@@ -216,7 +225,7 @@ class Manager
 
         if ($format !== null) {
             switch ($format) {
-                case 'json':
+                case AbstractCommand::FORMAT_JSON:
                     $output->setVerbosity($verbosity);
                     $output->writeln(json_encode(
                         [
@@ -246,7 +255,7 @@ class Manager
      *
      * @return void
      */
-    private function printMissingVersion($version, $maxNameLength)
+    protected function printMissingVersion($version, $maxNameLength)
     {
         $this->getOutput()->writeln(sprintf(
             '     <error>up</error>  %14.0f  %19s  %19s  <comment>%s</comment>  <error>** MISSING **</error>',
@@ -417,10 +426,10 @@ class Manager
      * Rollback an environment to the specified version.
      *
      * @param string $environment Environment
-     * @param int|string|null $target
-     * @param bool $force
-     * @param bool $targetMustMatchVersion
-     * @param bool $fake flag that if true, we just record running the migration, but not actually do the migration
+     * @param int|string|null $target Target
+     * @param bool $force Force
+     * @param bool $targetMustMatchVersion Target must match version
+     * @param bool $fake Flag that if true, we just record running the migration, but not actually do the migration
      *
      * @return void
      */
@@ -459,7 +468,7 @@ class Manager
             $migrationNames = array_map(function ($item) {
                 return $item['migration_name'];
             }, $executedVersions);
-            $found = array_search($target, $migrationNames);
+            $found = array_search($target, $migrationNames, true);
 
             // check on was found
             if ($found !== false) {
@@ -505,7 +514,8 @@ class Manager
                 $executedVersion = $executedVersions[$migration->getVersion()];
 
                 if (!$targetMustMatchVersion) {
-                    if (($this->getConfig()->isVersionOrderCreationTime() && $executedVersion['version'] <= $target) ||
+                    if (
+                        ($this->getConfig()->isVersionOrderCreationTime() && $executedVersion['version'] <= $target) ||
                         (!$this->getConfig()->isVersionOrderCreationTime() && $executedVersion['start_time'] <= $target)
                     ) {
                         break;
@@ -560,7 +570,7 @@ class Manager
     /**
      * Sets the environments.
      *
-     * @param array $environments Environments
+     * @param \Phinx\Migration\Manager\Environment[] $environments Environments
      *
      * @return $this
      */
@@ -597,6 +607,7 @@ class Manager
         // create an environment instance and cache it
         $envOptions = $this->getConfig()->getEnvironment($name);
         $envOptions['version_order'] = $this->getConfig()->getVersionOrder();
+        $envOptions['data_domain'] = $this->getConfig()->getDataDomain();
 
         $environment = new Environment($name, $envOptions);
         $this->environments[$name] = $environment;
@@ -604,6 +615,16 @@ class Manager
         $environment->setOutput($this->getOutput());
 
         return $environment;
+    }
+
+    /**
+     * Sets the user defined PSR-11 container
+     *
+     * @param \Psr\Container\ContainerInterface $container Container
+     */
+    public function setContainer(ContainerInterface $container)
+    {
+        $this->container = $container;
     }
 
     /**
@@ -657,7 +678,7 @@ class Manager
     /**
      * Sets the database migrations.
      *
-     * @param array $migrations Migrations
+     * @param \Phinx\Migration\AbstractMigration[] $migrations Migrations
      *
      * @return $this
      */
@@ -789,7 +810,7 @@ class Manager
     /**
      * Sets the database seeders.
      *
-     * @param array $seeds Seeders
+     * @param \Phinx\Seed\AbstractSeed[] $seeds Seeders
      *
      * @return $this
      */
@@ -807,7 +828,7 @@ class Manager
      *
      * @return \Phinx\Seed\AbstractSeed[]
      */
-    private function getSeedDependenciesInstances(AbstractSeed $seed)
+    protected function getSeedDependenciesInstances(AbstractSeed $seed)
     {
         $dependenciesInstances = [];
         $dependencies = $seed->getDependencies();
@@ -831,7 +852,7 @@ class Manager
      *
      * @return \Phinx\Seed\AbstractSeed[]
      */
-    private function orderSeedsByDependencies(array $seeds)
+    protected function orderSeedsByDependencies(array $seeds)
     {
         $orderedSeeds = [];
         foreach ($seeds as $seed) {
@@ -886,7 +907,20 @@ class Manager
                     }
 
                     // instantiate it
-                    $seed = new $class($this->getInput(), $this->getOutput());
+                    /** @var \Phinx\Seed\AbstractSeed $seed */
+                    if ($this->container !== null) {
+                        $seed = $this->container->get($class);
+                    } else {
+                        $seed = new $class();
+                    }
+                    $input = $this->getInput();
+                    if ($input !== null) {
+                        $seed->setInput($input);
+                    }
+                    $output = $this->getOutput();
+                    if ($output !== null) {
+                        $seed->setOutput($output);
+                    }
 
                     if (!($seed instanceof AbstractSeed)) {
                         throw new InvalidArgumentException(sprintf(
@@ -946,8 +980,8 @@ class Manager
     /**
      * Toggles the breakpoint for a specific version.
      *
-     * @param string $environment
-     * @param int|null $version
+     * @param string $environment Environment name
+     * @param int|null $version Version
      *
      * @return void
      */

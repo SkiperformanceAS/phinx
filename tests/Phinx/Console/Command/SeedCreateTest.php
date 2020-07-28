@@ -2,13 +2,13 @@
 
 namespace Test\Phinx\Console\Command;
 
+use InvalidArgumentException;
 use Phinx\Config\Config;
 use Phinx\Config\ConfigInterface;
 use Phinx\Console\Command\SeedCreate;
 use Phinx\Console\PhinxApplication;
 use Phinx\Migration\Manager;
 use PHPUnit\Framework\TestCase;
-use PHPUnit_Framework_MockObject_MockObject;
 use Symfony\Component\Console\Input\ArrayInput;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
@@ -32,7 +32,7 @@ class SeedCreateTest extends TestCase
      */
     protected $output;
 
-    protected function setUp()
+    public function setUp(): void
     {
         $this->config = new Config([
             'paths' => [
@@ -41,7 +41,7 @@ class SeedCreateTest extends TestCase
             ],
             'environments' => [
                 'default_migration_table' => 'phinxlog',
-                'default_database' => 'development',
+                'default_environment' => 'development',
                 'development' => [
                     'adapter' => 'mysql',
                     'host' => 'fakehost',
@@ -49,28 +49,28 @@ class SeedCreateTest extends TestCase
                     'user' => '',
                     'pass' => '',
                     'port' => 3006,
-                ]
-            ]
+                ],
+            ],
         ]);
 
         $this->input = new ArrayInput([]);
         $this->output = new StreamOutput(fopen('php://memory', 'a', false));
     }
 
-    /**
-     * @expectedException \InvalidArgumentException
-     * @expectedExceptionMessage The file "MyDuplicateSeeder.php" already exists
-     */
     public function testExecute()
     {
-        $application = new PhinxApplication('testing');
+        if (file_exists(sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'MyDuplicateSeeder.php')) {
+            unlink(sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'MyDuplicateSeeder.php');
+        }
+
+        $application = new PhinxApplication();
         $application->add(new SeedCreate());
 
         /** @var SeedCreate $command */
         $command = $application->find('seed:create');
 
         // mock the manager class
-        /** @var Manager|PHPUnit_Framework_MockObject_MockObject $managerStub */
+        /** @var Manager|\PHPUnit\Framework\MockObject\MockObject $managerStub */
         $managerStub = $this->getMockBuilder('\Phinx\Migration\Manager')
             ->setConstructorArgs([$this->config, $this->input, $this->output])
             ->getMock();
@@ -80,23 +80,23 @@ class SeedCreateTest extends TestCase
 
         $commandTester = new CommandTester($command);
         $commandTester->execute(['command' => $command->getName(), 'name' => 'MyDuplicateSeeder'], ['decorated' => false]);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('The file "MyDuplicateSeeder.php" already exists');
+
         $commandTester->execute(['command' => $command->getName(), 'name' => 'MyDuplicateSeeder'], ['decorated' => false]);
     }
 
-    /**
-     * @expectedException \InvalidArgumentException
-     * @expectedExceptionMessage The seed class name "badseedname" is invalid. Please use CamelCase format
-     */
     public function testExecuteWithInvalidClassName()
     {
-        $application = new PhinxApplication('testing');
+        $application = new PhinxApplication();
         $application->add(new SeedCreate());
 
         /** @var SeedCreate $command */
         $command = $application->find('seed:create');
 
         // mock the manager class
-        /** @var Manager|PHPUnit_Framework_MockObject_MockObject $managerStub */
+        /** @var Manager|\PHPUnit\Framework\MockObject\MockObject $managerStub */
         $managerStub = $this->getMockBuilder('\Phinx\Migration\Manager')
             ->setConstructorArgs([$this->config, $this->input, $this->output])
             ->getMock();
@@ -105,6 +105,10 @@ class SeedCreateTest extends TestCase
         $command->setManager($managerStub);
 
         $commandTester = new CommandTester($command);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('The seed class name "badseedname" is invalid. Please use CamelCase format');
+
         $commandTester->execute(['command' => $command->getName(), 'name' => 'badseedname'], ['decorated' => false]);
     }
 }

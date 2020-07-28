@@ -30,16 +30,24 @@ use RuntimeException;
  */
 class SQLiteAdapter extends PdoAdapter
 {
-    // list of supported Phinx column types with their SQL equivalents
-    // some types have an affinity appended to ensure they do not receive NUMERIC affinity
+    public const MEMORY = ':memory:';
+
+    /**
+     * List of supported Phinx column types with their SQL equivalents
+     * some types have an affinity appended to ensure they do not receive NUMERIC affinity
+     *
+     * @var string[]
+     */
     protected static $supportedColumnTypes = [
         self::PHINX_TYPE_BIG_INTEGER => 'biginteger',
         self::PHINX_TYPE_BINARY => 'binary_blob',
+        self::PHINX_TYPE_BINARYUUID => 'binary_blob',
         self::PHINX_TYPE_BLOB => 'blob',
         self::PHINX_TYPE_BOOLEAN => 'boolean_integer',
         self::PHINX_TYPE_CHAR => 'char',
         self::PHINX_TYPE_DATE => 'date_text',
         self::PHINX_TYPE_DATETIME => 'datetime_text',
+        self::PHINX_TYPE_DECIMAL => 'decimal',
         self::PHINX_TYPE_DOUBLE => 'double',
         self::PHINX_TYPE_FLOAT => 'float',
         self::PHINX_TYPE_INTEGER => 'integer',
@@ -49,16 +57,21 @@ class SQLiteAdapter extends PdoAdapter
         self::PHINX_TYPE_STRING => 'varchar',
         self::PHINX_TYPE_TEXT => 'text',
         self::PHINX_TYPE_TIME => 'time_text',
-        self::PHINX_TYPE_UUID => 'uuid_text',
         self::PHINX_TYPE_TIMESTAMP => 'timestamp_text',
+        self::PHINX_TYPE_TINY_INTEGER => 'tinyinteger',
+        self::PHINX_TYPE_UUID => 'uuid_text',
         self::PHINX_TYPE_VARBINARY => 'varbinary_blob',
     ];
 
-    // list of aliases of supported column types
+    /**
+     * List of aliases of supported column types
+     *
+     * @var string[]
+     */
     protected static $supportedColumnTypeAliases = [
         'varchar' => self::PHINX_TYPE_STRING,
-        'tinyint' => self::PHINX_TYPE_SMALL_INTEGER,
-        'tinyinteger' => self::PHINX_TYPE_SMALL_INTEGER,
+        'tinyint' => self::PHINX_TYPE_TINY_INTEGER,
+        'tinyinteger' => self::PHINX_TYPE_TINY_INTEGER,
         'smallint' => self::PHINX_TYPE_SMALL_INTEGER,
         'int' => self::PHINX_TYPE_INTEGER,
         'mediumint' => self::PHINX_TYPE_INTEGER,
@@ -73,7 +86,11 @@ class SQLiteAdapter extends PdoAdapter
         'real' => self::PHINX_TYPE_FLOAT,
     ];
 
-    // list of known but unsupported Phinx column types
+    /**
+     * List of known but unsupported Phinx column types
+     *
+     * @var string[]
+     */
     protected static $unsupportedColumnTypes = [
         self::PHINX_TYPE_BIT,
         self::PHINX_TYPE_CIDR,
@@ -90,6 +107,9 @@ class SQLiteAdapter extends PdoAdapter
         self::PHINX_TYPE_SET,
     ];
 
+    /**
+     * @var string[]
+     */
     protected $definitionsWithLimits = [
         'CHAR',
         'CHARACTER',
@@ -136,8 +156,8 @@ class SQLiteAdapter extends PdoAdapter
             $options = $this->getOptions();
 
             // use a memory database if the option was specified
-            if (!empty($options['memory'])) {
-                $dsn = 'sqlite::memory:';
+            if (!empty($options['memory']) || $options['name'] === static::MEMORY) {
+                $dsn = 'sqlite:' . static::MEMORY;
             } else {
                 $dsn = 'sqlite:' . $options['name'] . $this->suffix;
             }
@@ -175,9 +195,7 @@ class SQLiteAdapter extends PdoAdapter
     }
 
     /**
-     * {@inheritDoc}
-     *
-     * @return void
+     * @inheritDoc
      */
     public function disconnect()
     {
@@ -193,9 +211,7 @@ class SQLiteAdapter extends PdoAdapter
     }
 
     /**
-     * {@inheritDoc}
-     *
-     * @return void
+     * @inheritDoc
      */
     public function beginTransaction()
     {
@@ -203,9 +219,7 @@ class SQLiteAdapter extends PdoAdapter
     }
 
     /**
-     * {@inheritDoc}
-     *
-     * @return void
+     * @inheritDoc
      */
     public function commitTransaction()
     {
@@ -213,9 +227,7 @@ class SQLiteAdapter extends PdoAdapter
     }
 
     /**
-     * {@inheritDoc}
-     *
-     * @return void
+     * @inheritDoc
      */
     public function rollbackTransaction()
     {
@@ -341,9 +353,7 @@ class SQLiteAdapter extends PdoAdapter
     }
 
     /**
-     * {@inheritDoc}
-     *
-     * @return void
+     * @inheritDoc
      */
     public function createTable(Table $table, array $columns = [], array $indexes = [])
     {
@@ -371,7 +381,7 @@ class SQLiteAdapter extends PdoAdapter
             if (isset($options['primary_key']) && $column->getIdentity()) {
                 //remove column from the primary key array as it is already defined as an autoincrement
                 //primary id
-                $identityColumnIndex = array_search($column->getName(), $options['primary_key']);
+                $identityColumnIndex = array_search($column->getName(), $options['primary_key'], true);
                 if ($identityColumnIndex !== false) {
                     unset($options['primary_key'][$identityColumnIndex]);
 
@@ -444,11 +454,11 @@ class SQLiteAdapter extends PdoAdapter
     }
 
     /**
-     * {@inheritDoc}
+     * @inheritDoc
+     *
+     * SQLiteAdapter does not implement this functionality, and so will always throw an exception if used.
      *
      * @throws \BadMethodCallException
-     *
-     * @return void
      */
     protected function getChangeCommentInstructions(Table $table, $newComment)
     {
@@ -482,9 +492,7 @@ class SQLiteAdapter extends PdoAdapter
     }
 
     /**
-     * {@inheritDoc}
-     *
-     * @return void
+     * @inheritDoc
      */
     public function truncateTable($tableName)
     {
@@ -557,7 +565,7 @@ PCRE_PATTERN;
         } elseif (preg_match('/^[+-]?\d+$/i', $vBare)) {
             $int = (int)$vBare;
             // integer literal
-            if ($t === self::PHINX_TYPE_BOOLEAN && ($int == 0 || $int == 1)) {
+            if ($t === self::PHINX_TYPE_BOOLEAN && ($int === 0 || $int === 1)) {
                 return (bool)$int;
             } else {
                 return $int;
@@ -673,14 +681,41 @@ PCRE_PATTERN;
      */
     protected function getAddColumnInstructions(Table $table, Column $column)
     {
-        $alter = sprintf(
-            'ALTER TABLE %s ADD COLUMN %s %s',
-            $this->quoteTableName($table->getName()),
-            $this->quoteColumnName($column->getName()),
-            $this->getColumnSqlDefinition($column)
-        );
+        $tableName = $table->getName();
 
-        return new AlterInstructions([], [$alter]);
+        $instructions = $this->beginAlterByCopyTable($tableName);
+
+        $instructions->addPostStep(function ($state) use ($tableName, $column) {
+            // we use the final column to anchor our regex to insert the new column,
+            // as the alternative is unwinding all possible table constraints which
+            // gets messy quickly with CHECK constraints.
+            $columns = $this->getColumns($tableName);
+            $finalColumnName = end($columns)->getName();
+            $sql = preg_replace(
+                sprintf(
+                    "/(%s(?:\/\*.*?\*\/|\([^)]+\)|'[^']*?'|[^,])+)([,)])/",
+                    $this->quoteColumnName($finalColumnName)
+                ),
+                sprintf(
+                    '$1, %s %s$2',
+                    $this->quoteColumnName($column->getName()),
+                    $this->getColumnSqlDefinition($column)
+                ),
+                $state['createSQL'],
+                1
+            );
+            $this->execute($sql);
+
+            return $state;
+        });
+
+        $instructions->addPostStep(function ($state) use ($tableName) {
+            $newState = $this->calculateNewTableColumns($tableName, false, false);
+
+            return $newState + $state;
+        });
+
+        return $this->copyAndDropTmpTable($instructions, $tableName);
     }
 
     /**
@@ -763,12 +798,12 @@ PCRE_PATTERN;
      * of altering a table
      *
      * @param string $tableName The table to modify
-     * @param string $columnName The column name that is about to change
+     * @param string|false $columnName The column name that is about to change
      * @param string|false $newColumnName Optionally the new name for the column
      *
      * @throws \InvalidArgumentException
      *
-     * @return \Phinx\Db\Util\AlterInstructions
+     * @return array
      */
     protected function calculateNewTableColumns($tableName, $columnName, $newColumnName)
     {
@@ -782,7 +817,7 @@ PCRE_PATTERN;
             $selectName = $column['name'];
             $writeName = $selectName;
 
-            if ($selectName == $columnName) {
+            if ($selectName === $columnName) {
                 $writeName = $newColumnName;
                 $found = true;
                 $columnType = $column['type'];
@@ -798,7 +833,7 @@ PCRE_PATTERN;
         $selectColumns = array_map([$this, 'quoteColumnName'], $selectColumns);
         $writeColumns = array_map([$this, 'quoteColumnName'], $writeColumns);
 
-        if (!$found) {
+        if ($columnName && !$found) {
             throw new InvalidArgumentException(sprintf(
                 'The specified column doesn\'t exist: ' . $columnName
             ));
@@ -934,7 +969,7 @@ PCRE_PATTERN;
     /**
      * Get an array of indexes from a particular table.
      *
-     * @param string $tableName Table Name
+     * @param string $tableName Table name
      *
      * @return array
      */
@@ -1099,7 +1134,7 @@ PCRE_PATTERN;
     /**
      * Get the primary key from a particular table.
      *
-     * @param string $tableName Table Name
+     * @param string $tableName Table name
      *
      * @return string[]
      */
@@ -1147,7 +1182,7 @@ PCRE_PATTERN;
     /**
      * Get an array of foreign keys from a particular table.
      *
-     * @param string $tableName Table Name
+     * @param string $tableName Table name
      *
      * @return array
      */
@@ -1269,11 +1304,11 @@ PCRE_PATTERN;
     }
 
     /**
-     * {@inheritDoc}
+     * @inheritDoc
+     *
+     * SQLiteAdapter does not implement this functionality, and so will always throw an exception if used.
      *
      * @throws \BadMethodCallException
-     *
-     * @return void
      */
     protected function getDropForeignKeyInstructions($tableName, $constraint)
     {
@@ -1338,7 +1373,7 @@ PCRE_PATTERN;
             $name = $type;
         } elseif (isset(self::$supportedColumnTypes[$typeLC])) {
             $name = self::$supportedColumnTypes[$typeLC];
-        } elseif (in_array($typeLC, self::$unsupportedColumnTypes)) {
+        } elseif (in_array($typeLC, self::$unsupportedColumnTypes, true)) {
             throw new UnsupportedColumnTypeException('Column type "' . $type . '" is not supported by SQLite.');
         } else {
             throw new UnsupportedColumnTypeException('Column type "' . $type . '" is not known by SQLite.');
@@ -1350,7 +1385,7 @@ PCRE_PATTERN;
     /**
      * Returns Phinx type by SQL type
      *
-     * @param string|null $sqlTypeDef SQL type
+     * @param string|null $sqlTypeDef SQL Type definition
      *
      * @return array
      */
@@ -1368,20 +1403,20 @@ PCRE_PATTERN;
             // possibly a known type
             $type = $match[1];
             $typeLC = strtolower($type);
-            $affinity = isset($match[2]) ? $match[2] : '';
+            $affinity = $match[2] ?? '';
             $limit = isset($match[3]) && strlen($match[3]) ? (int)$match[3] : null;
             $scale = isset($match[4]) && strlen($match[4]) ? (int)$match[4] : null;
-            if (isset(self::$supportedColumnTypes[$typeLC])) {
-                // the type is an explicitly supported type
-                $name = $typeLC;
-            } elseif ($typeLC === 'tinyint' && $limit == 1) {
+            if (in_array($typeLC, ['tinyint', 'tinyinteger'], true) && $limit === 1) {
                 // the type is a MySQL-style boolean
                 $name = static::PHINX_TYPE_BOOLEAN;
                 $limit = null;
+            } elseif (isset(self::$supportedColumnTypes[$typeLC])) {
+                // the type is an explicitly supported type
+                $name = $typeLC;
             } elseif (isset(self::$supportedColumnTypeAliases[$typeLC])) {
                 // the type is an alias for a supported type
                 $name = self::$supportedColumnTypeAliases[$typeLC];
-            } elseif (in_array($typeLC, self::$unsupportedColumnTypes)) {
+            } elseif (in_array($typeLC, self::$unsupportedColumnTypes, true)) {
                 // unsupported but known types are passed through lowercased, and without appended affinity
                 $name = Literal::from($typeLC);
             } else {
@@ -1398,9 +1433,7 @@ PCRE_PATTERN;
     }
 
     /**
-     * {@inheritDoc}
-     *
-     * @return void
+     * @inheritDoc
      */
     public function createDatabase($name, $options = [])
     {
@@ -1416,9 +1449,7 @@ PCRE_PATTERN;
     }
 
     /**
-     * {@inheritDoc}
-     *
-     * @return void
+     * @inheritDoc
      */
     public function dropDatabase($name)
     {
@@ -1447,7 +1478,7 @@ PCRE_PATTERN;
             $sqlType = $this->getSqlType($column->getType());
             $def = strtoupper($sqlType['name']);
 
-            $limitable = in_array(strtoupper($sqlType['name']), $this->definitionsWithLimits);
+            $limitable = in_array(strtoupper($sqlType['name']), $this->definitionsWithLimits, true);
             if (($column->getLimit() || isset($sqlType['limit'])) && $limitable) {
                 $def .= '(' . ($column->getLimit() ?: $sqlType['limit']) . ')';
             }
@@ -1458,13 +1489,9 @@ PCRE_PATTERN;
 
         $default = $column->getDefault();
 
-        $def .= (!$column->isIdentity() && ($column->isNull() || $default === null)) ? ' NULL' : ' NOT NULL';
+        $def .= $column->isNull() ? ' NULL' : ' NOT NULL';
         $def .= $this->getDefaultValueDefinition($default, $column->getType());
         $def .= $column->isIdentity() ? ' PRIMARY KEY AUTOINCREMENT' : '';
-
-        if ($column->getUpdate()) {
-            $def .= ' ON UPDATE ' . $column->getUpdate();
-        }
 
         $def .= $this->getCommentDefinition($column);
 
@@ -1521,13 +1548,13 @@ PCRE_PATTERN;
      */
     public function getColumnTypes()
     {
-        return array_keys(self::$supportedColumnTypes);
+        return array_keys(static::$supportedColumnTypes);
     }
 
     /**
      * Gets the SQLite Foreign Key Definition for an ForeignKey object.
      *
-     * @param \Phinx\Db\Table\ForeignKey $foreignKey
+     * @param \Phinx\Db\Table\ForeignKey $foreignKey Foreign key
      *
      * @return string
      */
@@ -1565,7 +1592,6 @@ PCRE_PATTERN;
     {
         $options = $this->getOptions();
         $options['quoteIdentifiers'] = true;
-        $database = ':memory:';
 
         if (!empty($options['name'])) {
             $options['database'] = $options['name'];
@@ -1575,12 +1601,12 @@ PCRE_PATTERN;
             }
         }
 
-        $driver = new SqliteDriver($options);
-        if (method_exists($driver, 'setConnection')) {
-            $driver->setConnection($this->connection);
-        } else {
-            $driver->connection($this->connection);
+        if ($this->connection === null) {
+            throw new RuntimeException('You need to connect first.');
         }
+
+        $driver = new SqliteDriver($options);
+        $driver->setConnection($this->connection);
 
         return new Connection(['driver' => $driver] + $options);
     }
