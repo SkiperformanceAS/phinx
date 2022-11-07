@@ -10,6 +10,8 @@ namespace Phinx\Util;
 use DateTime;
 use DateTimeZone;
 use Exception;
+use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Output\OutputInterface;
 
 class Util
 {
@@ -43,7 +45,7 @@ class Util
      *
      * @return string
      */
-    public static function getCurrentTimestamp()
+    public static function getCurrentTimestamp(): string
     {
         $dt = new DateTime('now', new DateTimeZone('UTC'));
 
@@ -54,10 +56,9 @@ class Util
      * Gets an array of all the existing migration class names.
      *
      * @param string $path Path
-     *
      * @return string[]
      */
-    public static function getExistingMigrationClassNames($path)
+    public static function getExistingMigrationClassNames(string $path): array
     {
         $classNames = [];
 
@@ -82,10 +83,9 @@ class Util
      * Get the version from the beginning of a file name.
      *
      * @param string $fileName File Name
-     *
      * @return string
      */
-    public static function getVersionFromFileName($fileName)
+    public static function getVersionFromFileName(string $fileName): string
     {
         $matches = [];
         preg_match('/^[0-9]+/', basename($fileName), $matches);
@@ -99,10 +99,9 @@ class Util
      * '12345678901234_limit_resource_names_to_30_chars.php'.
      *
      * @param string $className Class Name
-     *
      * @return string
      */
-    public static function mapClassNameToFileName($className)
+    public static function mapClassNameToFileName(string $className): string
     {
         $snake = function ($matches) {
             return '_' . strtolower($matches[0]);
@@ -118,7 +117,6 @@ class Util
      * names like 'CreateUserTable'.
      *
      * @param string $fileName File Name
-     *
      * @return string
      */
     public static function mapFileNameToClassName(string $fileName): string
@@ -127,7 +125,7 @@ class Util
         if (preg_match(static::MIGRATION_FILE_NAME_PATTERN, $fileName, $matches)) {
             $fileName = $matches[1];
         } elseif (preg_match(static::MIGRATION_FILE_NAME_NO_NAME_PATTERN, $fileName)) {
-            return "V" . substr($fileName, 0, strlen($fileName) - 4);
+            return 'V' . substr($fileName, 0, strlen($fileName) - 4);
         }
 
         $className = str_replace('_', '', ucwords($fileName, '_'));
@@ -147,10 +145,9 @@ class Util
      *
      * @param string $className Class Name
      * @param string $path Path
-     *
      * @return bool
      */
-    public static function isUniqueMigrationClassName($className, $path)
+    public static function isUniqueMigrationClassName(string $className, string $path): bool
     {
         $existingClassNames = static::getExistingMigrationClassNames($path);
 
@@ -166,10 +163,9 @@ class Util
      * Single words are not allowed on their own.
      *
      * @param string $className Class Name
-     *
      * @return bool
      */
-    public static function isValidPhinxClassName($className)
+    public static function isValidPhinxClassName(string $className): bool
     {
         return (bool)preg_match(static::CLASS_NAME_PATTERN, $className);
     }
@@ -178,25 +174,21 @@ class Util
      * Check if a migration file name is valid.
      *
      * @param string $fileName File Name
-     *
      * @return bool
      */
     public static function isValidMigrationFileName(string $fileName): bool
     {
-        return (
-            (bool)preg_match(static::MIGRATION_FILE_NAME_PATTERN, $fileName)
-            || (bool)preg_match(static::MIGRATION_FILE_NAME_NO_NAME_PATTERN, $fileName)
-        );
+        return (bool)preg_match(static::MIGRATION_FILE_NAME_PATTERN, $fileName)
+            || (bool)preg_match(static::MIGRATION_FILE_NAME_NO_NAME_PATTERN, $fileName);
     }
 
     /**
      * Check if a seed file name is valid.
      *
      * @param string $fileName File Name
-     *
      * @return bool
      */
-    public static function isValidSeedFileName($fileName)
+    public static function isValidSeedFileName(string $fileName): bool
     {
         return (bool)preg_match(static::SEED_FILE_NAME_PATTERN, $fileName);
     }
@@ -205,10 +197,9 @@ class Util
      * Expands a set of paths with curly braces (if supported by the OS).
      *
      * @param string[] $paths Paths
-     *
      * @return string[]
      */
-    public static function globAll(array $paths)
+    public static function globAll(array $paths): array
     {
         $result = [];
 
@@ -223,10 +214,9 @@ class Util
      * Expands a path with curly braces (if supported by the OS).
      *
      * @param string $path Path
-     *
      * @return string[]
      */
-    public static function glob($path)
+    public static function glob(string $path): array
     {
         return glob($path, defined('GLOB_BRACE') ? GLOB_BRACE : 0);
     }
@@ -235,12 +225,13 @@ class Util
      * Takes the path to a php file and attempts to include it if readable
      *
      * @param string $filename Filename
-     *
+     * @param \Symfony\Component\Console\Input\InputInterface|null $input Input
+     * @param \Symfony\Component\Console\Output\OutputInterface|null $output Output
+     * @param \Phinx\Console\Command\AbstractCommand|mixed|null $context Context
      * @throws \Exception
-     *
      * @return string
      */
-    public static function loadPhpFile($filename)
+    public static function loadPhpFile(string $filename, ?InputInterface $input = null, ?OutputInterface $output = null, $context = null): string
     {
         $filePath = realpath($filename);
         if (!file_exists($filePath)) {
@@ -258,6 +249,9 @@ class Util
             throw new Exception(sprintf("Cannot open file %s \n", $filename));
         }
 
+        // prevent this to be propagated to the included file
+        unset($isReadable);
+
         include_once $filePath;
 
         return $filePath;
@@ -267,21 +261,46 @@ class Util
      * Given an array of paths, return all unique PHP files that are in them
      *
      * @param string|string[] $paths Path or array of paths to get .php files.
-     *
      * @return string[]
      */
-    public static function getFiles($paths)
+    public static function getFiles($paths): array
     {
         $files = static::globAll(array_map(function ($path) {
-            return $path . DIRECTORY_SEPARATOR . "*.php";
+            return $path . DIRECTORY_SEPARATOR . '*.php';
         }, (array)$paths));
         // glob() can return the same file multiple times
         // This will cause the migration to fail with a
         // false assumption of duplicate migrations
-        // http://php.net/manual/en/function.glob.php#110340
+        // https://php.net/manual/en/function.glob.php#110340
         $files = array_unique($files);
 
         return $files;
+    }
+
+    /**
+     * Attempt to remove the current working directory from a path for output.
+     *
+     * @param string $path Path to remove cwd prefix from
+     * @return string
+     */
+    public static function relativePath(string $path): string
+    {
+        $realpath = realpath($path);
+        if ($realpath !== false) {
+            $path = $realpath;
+        }
+
+        $cwd = getcwd();
+        if ($cwd !== false) {
+            $cwd .= DIRECTORY_SEPARATOR;
+            $cwdLen = strlen($cwd);
+
+            if (substr($path, 0, $cwdLen) === $cwd) {
+                $path = substr($path, $cwdLen);
+            }
+        }
+
+        return $path;
     }
 
     /**

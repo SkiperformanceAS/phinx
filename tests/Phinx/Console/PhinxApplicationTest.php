@@ -2,7 +2,6 @@
 
 namespace Test\Phinx\Console;
 
-use Phinx\Console\Command\AbstractCommand;
 use Phinx\Console\PhinxApplication;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Tester\ApplicationTester;
@@ -11,8 +10,7 @@ class PhinxApplicationTest extends TestCase
 {
     /**
      * @dataProvider provider
-     *
-     * @param AbstractCommand $command
+     * @param \Phinx\Console\Command\AbstractCommand $command
      * @param $result
      */
     public function testRun($command, $result)
@@ -26,13 +24,13 @@ class PhinxApplicationTest extends TestCase
         $stream = $appTester->getOutput()->getStream();
         rewind($stream);
 
-        $this->assertRegExp($result, stream_get_contents($stream));
+        $this->assertStringContainsString($result, stream_get_contents($stream));
     }
 
     public function provider()
     {
         return [
-            ['help', '/help \[options\] \[--\] \[<command_name>\]/'],
+            ['help', 'help [options] [--] [<command_name>]'],
         ];
     }
 }

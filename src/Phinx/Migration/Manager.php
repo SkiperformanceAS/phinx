@@ -49,12 +49,12 @@ class Manager
     protected $environments = [];
 
     /**
-     * @var \Phinx\Migration\AbstractMigration[]|null
+     * @var \Phinx\Migration\MigrationInterface[]|null
      */
     protected $migrations;
 
     /**
-     * @var \Phinx\Seed\AbstractSeed[]|null
+     * @var \Phinx\Seed\SeedInterface[]|null
      */
     protected $seeds;
 
@@ -62,6 +62,11 @@ class Manager
      * @var \Psr\Container\ContainerInterface
      */
     protected $container;
+
+    /**
+     * @var int
+     */
+    private $verbosityLevel = OutputInterface::OUTPUT_NORMAL | OutputInterface::VERBOSITY_NORMAL;
 
     /**
      * @param \Phinx\Config\ConfigInterface $config Configuration Object
@@ -80,12 +85,10 @@ class Manager
      *
      * @param string $environment environment to print status of
      * @param string|null $format format to print status in (either text, json, or null)
-     *
      * @throws \RuntimeException
-     *
      * @return array array indicating if there are any missing or down migrations
      */
-    public function printStatus($environment, $format = null)
+    public function printStatus(string $environment, ?string $format = null): array
     {
         $output = $this->getOutput();
         $hasDownMigration = false;
@@ -102,21 +105,21 @@ class Manager
         if (count($migrations)) {
             // rewrite using Symfony Table Helper as we already have this library
             // included and it will fix formatting issues (e.g drawing the lines)
-            $output->writeln('');
+            $output->writeln('', $this->verbosityLevel);
 
             switch ($this->getConfig()->getVersionOrder()) {
                 case Config::VERSION_ORDER_CREATION_TIME:
-                    $migrationIdAndStartedHeader = "<info>[Migration ID]</info>  Started            ";
+                    $migrationIdAndStartedHeader = '<info>[Migration ID]</info>  Started            ';
                     break;
                 case Config::VERSION_ORDER_EXECUTION_TIME:
-                    $migrationIdAndStartedHeader = "Migration ID    <info>[Started          ]</info>";
+                    $migrationIdAndStartedHeader = 'Migration ID    <info>[Started          ]</info>';
                     break;
                 default:
                     throw new RuntimeException('Invalid version_order configuration option');
             }
 
-            $output->writeln(" Status  $migrationIdAndStartedHeader  Finished             Migration Name ");
-            $output->writeln('----------------------------------------------------------------------------------');
+            $output->writeln(" Status  $migrationIdAndStartedHeader  Finished             Migration Name ", $this->verbosityLevel);
+            $output->writeln('----------------------------------------------------------------------------------', $this->verbosityLevel);
 
             $env = $this->getEnvironment($environment);
             $versions = $env->getVersionLog();
@@ -191,17 +194,20 @@ class Manager
                 }
                 $maxNameLength = max($maxNameLength, strlen($migration->getName()));
 
-                $output->writeln(sprintf(
-                    '%s %14.0f  %19s  %19s  <comment>%s</comment>',
-                    $status,
-                    $migration->getVersion(),
-                    ($version ? $version['start_time'] : ''),
-                    ($version ? $version['end_time'] : ''),
-                    $migration->getName()
-                ));
+                $output->writeln(
+                    sprintf(
+                        '%s %14.0f  %19s  %19s  <comment>%s</comment>',
+                        $status,
+                        $migration->getVersion(),
+                        ($version ? $version['start_time'] : ''),
+                        ($version ? $version['end_time'] : ''),
+                        $migration->getName()
+                    ),
+                    $this->verbosityLevel
+                );
 
                 if ($version && $version['breakpoint']) {
-                    $output->writeln('         <error>BREAKPOINT SET</error>');
+                    $output->writeln('         <error>BREAKPOINT SET</error>', $this->verbosityLevel);
                 }
 
                 $finalMigrations[] = ['migration_status' => trim(strip_tags($status)), 'migration_id' => sprintf('%14.0f', $migration->getVersion()), 'migration_name' => $migration->getName()];
@@ -216,12 +222,12 @@ class Manager
             }
         } else {
             // there are no migrations
-            $output->writeln('');
-            $output->writeln('There are no available migrations. Try creating one using the <info>create</info> command.');
+            $output->writeln('', $this->verbosityLevel);
+            $output->writeln('There are no available migrations. Try creating one using the <info>create</info> command.', $this->verbosityLevel);
         }
 
         // write an empty line
-        $output->writeln('');
+        $output->writeln('', $this->verbosityLevel);
 
         if ($format !== null) {
             switch ($format) {
@@ -252,13 +258,12 @@ class Manager
      *
      * @param array $version The missing version to print (in the format returned by Environment.getVersionLog).
      * @param int $maxNameLength The maximum migration name length.
-     *
      * @return void
      */
-    protected function printMissingVersion($version, $maxNameLength)
+    protected function printMissingVersion(array $version, int $maxNameLength): void
     {
         $this->getOutput()->writeln(sprintf(
-            '     <error>up</error>  %14.0f  %19s  %19s  <comment>%s</comment>  <error>** MISSING **</error>',
+            '     <error>up</error>  %14.0f  %19s  %19s  <comment>%s</comment>  <error>** MISSING MIGRATION FILE **</error>',
             $version['version'],
             $version['start_time'],
             $version['end_time'],
@@ -277,10 +282,9 @@ class Manager
      * @param \DateTime $dateTime Date to migrate to
      * @param bool $fake flag that if true, we just record running the migration, but not actually do the
      *                               migration
-     *
      * @return void
      */
-    public function migrateToDateTime($environment, DateTime $dateTime, $fake = false)
+    public function migrateToDateTime(string $environment, DateTime $dateTime, bool $fake = false): void
     {
         $versions = array_keys($this->getMigrations($environment));
         $dateString = $dateTime->format('YmdHis');
@@ -291,7 +295,7 @@ class Manager
 
         if (count($outstandingMigrations) > 0) {
             $migration = max($outstandingMigrations);
-            $this->getOutput()->writeln('Migrating to version ' . $migration);
+            $this->getOutput()->writeln('Migrating to version ' . $migration, $this->verbosityLevel);
             $this->migrate($environment, $migration, $fake);
         }
     }
@@ -302,10 +306,9 @@ class Manager
      * @param string $environment Environment
      * @param int|null $version version to migrate to
      * @param bool $fake flag that if true, we just record running the migration, but not actually do the migration
-     *
      * @return void
      */
-    public function migrate($environment, $version = null, $fake = false)
+    public function migrate(string $environment, ?int $version = null, bool $fake = false): void
     {
         $migrations = $this->getMigrations($environment);
         $env = $this->getEnvironment($environment);
@@ -365,30 +368,30 @@ class Manager
      * @param \Phinx\Migration\MigrationInterface $migration Migration
      * @param string $direction Direction
      * @param bool $fake flag that if true, we just record running the migration, but not actually do the migration
-     *
      * @return void
      */
-    public function executeMigration($name, MigrationInterface $migration, $direction = MigrationInterface::UP, $fake = false)
+    public function executeMigration(string $name, MigrationInterface $migration, string $direction = MigrationInterface::UP, bool $fake = false): void
     {
-        $this->getOutput()->writeln('');
-        $this->getOutput()->writeln(
-            ' ==' .
-            ' <info>' . $migration->getVersion() . ' ' . $migration->getName() . ':</info>' .
-            ' <comment>' . ($direction === MigrationInterface::UP ? 'migrating' : 'reverting') . '</comment>'
-        );
-        $migration->preFlightCheck($direction);
+        $this->getOutput()->writeln('', $this->verbosityLevel);
+
+        // Skip the migration if it should not be executed
+        if (!$migration->shouldExecute()) {
+            $this->printMigrationStatus($migration, 'skipped');
+
+            return;
+        }
+
+        $this->printMigrationStatus($migration, ($direction === MigrationInterface::UP ? 'migrating' : 'reverting'));
 
         // Execute the migration and log the time elapsed.
         $start = microtime(true);
         $this->getEnvironment($name)->executeMigration($migration, $direction, $fake);
         $end = microtime(true);
 
-        $migration->postFlightCheck($direction);
-        $this->getOutput()->writeln(
-            ' ==' .
-            ' <info>' . $migration->getVersion() . ' ' . $migration->getName() . ':</info>' .
-            ' <comment>' . ($direction === MigrationInterface::UP ? 'migrated' : 'reverted') .
-            ' ' . sprintf('%.4fs', $end - $start) . '</comment>'
+        $this->printMigrationStatus(
+            $migration,
+            ($direction === MigrationInterface::UP ? 'migrated' : 'reverted'),
+            sprintf('%.4fs', $end - $start)
         );
     }
 
@@ -397,28 +400,82 @@ class Manager
      *
      * @param string $name Environment Name
      * @param \Phinx\Seed\SeedInterface $seed Seed
-     *
      * @return void
      */
-    public function executeSeed($name, SeedInterface $seed)
+    public function executeSeed(string $name, SeedInterface $seed): void
     {
-        $this->getOutput()->writeln('');
-        $this->getOutput()->writeln(
-            ' ==' .
-            ' <info>' . $seed->getName() . ':</info>' .
-            ' <comment>seeding</comment>'
-        );
+        $this->getOutput()->writeln('', $this->verbosityLevel);
+
+        // Skip the seed if it should not be executed
+        if (!$seed->shouldExecute()) {
+            $this->printSeedStatus($seed, 'skipped');
+
+            return;
+        }
+
+        $this->printSeedStatus($seed, 'seeding');
 
         // Execute the seeder and log the time elapsed.
         $start = microtime(true);
         $this->getEnvironment($name)->executeSeed($seed);
         $end = microtime(true);
 
+        $this->printSeedStatus(
+            $seed,
+            'seeded',
+            sprintf('%.4fs', $end - $start)
+        );
+    }
+
+    /**
+     * Print Migration Status
+     *
+     * @param \Phinx\Migration\MigrationInterface $migration Migration
+     * @param string $status Status of the migration
+     * @param string|null $duration Duration the migration took the be executed
+     * @return void
+     */
+    protected function printMigrationStatus(MigrationInterface $migration, string $status, ?string $duration = null): void
+    {
+        $this->printStatusOutput(
+            $migration->getVersion() . ' ' . $migration->getName(),
+            $status,
+            $duration
+        );
+    }
+
+    /**
+     * Print Seed Status
+     *
+     * @param \Phinx\Seed\SeedInterface $seed Seed
+     * @param string $status Status of the seed
+     * @param string|null $duration Duration the seed took the be executed
+     * @return void
+     */
+    protected function printSeedStatus(SeedInterface $seed, string $status, ?string $duration = null): void
+    {
+        $this->printStatusOutput(
+            $seed->getName(),
+            $status,
+            $duration
+        );
+    }
+
+    /**
+     * Print Status in Output
+     *
+     * @param string $name Name of the migration or seed
+     * @param string $status Status of the migration or seed
+     * @param string|null $duration Duration the migration or seed took the be executed
+     * @return void
+     */
+    protected function printStatusOutput(string $name, string $status, ?string $duration = null): void
+    {
         $this->getOutput()->writeln(
             ' ==' .
-            ' <info>' . $seed->getName() . ':</info>' .
-            ' <comment>seeded' .
-            ' ' . sprintf('%.4fs', $end - $start) . '</comment>'
+            ' <info>' . $name . ':</info>' .
+            ' <comment>' . $status . ' ' . $duration . '</comment>',
+            $this->verbosityLevel
         );
     }
 
@@ -430,10 +487,9 @@ class Manager
      * @param bool $force Force
      * @param bool $targetMustMatchVersion Target must match version
      * @param bool $fake Flag that if true, we just record running the migration, but not actually do the migration
-     *
      * @return void
      */
-    public function rollback($environment, $target = null, $force = false, $targetMustMatchVersion = true, $fake = false)
+    public function rollback(string $environment, $target = null, bool $force = false, bool $targetMustMatchVersion = true, bool $fake = false): void
     {
         // note that the migrations are indexed by name (aka creation time) in ascending order
         $migrations = $this->getMigrations($environment);
@@ -541,14 +597,12 @@ class Manager
      *
      * @param string $environment Environment
      * @param string|null $seed Seeder
-     *
      * @throws \InvalidArgumentException
-     *
      * @return void
      */
-    public function seed($environment, $seed = null)
+    public function seed(string $environment, ?string $seed = null): void
     {
-        $seeds = $this->getSeeds();
+        $seeds = $this->getSeeds($environment);
 
         if ($seed === null) {
             // run all seeders
@@ -571,10 +625,9 @@ class Manager
      * Sets the environments.
      *
      * @param \Phinx\Migration\Manager\Environment[] $environments Environments
-     *
      * @return $this
      */
-    public function setEnvironments($environments = [])
+    public function setEnvironments(array $environments = [])
     {
         $this->environments = $environments;
 
@@ -585,12 +638,10 @@ class Manager
      * Gets the manager class for the given environment.
      *
      * @param string $name Environment Name
-     *
      * @throws \InvalidArgumentException
-     *
      * @return \Phinx\Migration\Manager\Environment
      */
-    public function getEnvironment($name)
+    public function getEnvironment(string $name): Environment
     {
         if (isset($this->environments[$name])) {
             return $this->environments[$name];
@@ -621,17 +672,19 @@ class Manager
      * Sets the user defined PSR-11 container
      *
      * @param \Psr\Container\ContainerInterface $container Container
+     * @return $this
      */
     public function setContainer(ContainerInterface $container)
     {
         $this->container = $container;
+
+        return $this;
     }
 
     /**
      * Sets the console input.
      *
      * @param \Symfony\Component\Console\Input\InputInterface $input Input
-     *
      * @return $this
      */
     public function setInput(InputInterface $input)
@@ -646,7 +699,7 @@ class Manager
      *
      * @return \Symfony\Component\Console\Input\InputInterface
      */
-    public function getInput()
+    public function getInput(): InputInterface
     {
         return $this->input;
     }
@@ -655,7 +708,6 @@ class Manager
      * Sets the console output.
      *
      * @param \Symfony\Component\Console\Output\OutputInterface $output Output
-     *
      * @return $this
      */
     public function setOutput(OutputInterface $output)
@@ -670,7 +722,7 @@ class Manager
      *
      * @return \Symfony\Component\Console\Output\OutputInterface
      */
-    public function getOutput()
+    public function getOutput(): OutputInterface
     {
         return $this->output;
     }
@@ -679,7 +731,6 @@ class Manager
      * Sets the database migrations.
      *
      * @param \Phinx\Migration\AbstractMigration[] $migrations Migrations
-     *
      * @return $this
      */
     public function setMigrations(array $migrations)
@@ -694,12 +745,10 @@ class Manager
      * order
      *
      * @param string $environment Environment
-     *
      * @throws \InvalidArgumentException
-     *
-     * @return \Phinx\Migration\AbstractMigration[]
+     * @return \Phinx\Migration\MigrationInterface[]
      */
-    public function getMigrations($environment)
+    public function getMigrations(string $environment): array
     {
         if ($this->migrations === null) {
             $phpFiles = $this->getMigrationFiles();
@@ -802,7 +851,7 @@ class Manager
      *
      * @return string[]
      */
-    protected function getMigrationFiles()
+    protected function getMigrationFiles(): array
     {
         return Util::getFiles($this->getConfig()->getMigrationPaths());
     }
@@ -810,8 +859,7 @@ class Manager
     /**
      * Sets the database seeders.
      *
-     * @param \Phinx\Seed\AbstractSeed[] $seeds Seeders
-     *
+     * @param \Phinx\Seed\SeedInterface[] $seeds Seeders
      * @return $this
      */
     public function setSeeds(array $seeds)
@@ -824,11 +872,10 @@ class Manager
     /**
      * Get seed dependencies instances from seed dependency array
      *
-     * @param \Phinx\Seed\AbstractSeed $seed Seed
-     *
-     * @return \Phinx\Seed\AbstractSeed[]
+     * @param \Phinx\Seed\SeedInterface $seed Seed
+     * @return \Phinx\Seed\SeedInterface[]
      */
-    protected function getSeedDependenciesInstances(AbstractSeed $seed)
+    protected function getSeedDependenciesInstances(SeedInterface $seed): array
     {
         $dependenciesInstances = [];
         $dependencies = $seed->getDependencies();
@@ -848,11 +895,10 @@ class Manager
     /**
      * Order seeds by dependencies
      *
-     * @param \Phinx\Seed\AbstractSeed[] $seeds Seeds
-     *
-     * @return \Phinx\Seed\AbstractSeed[]
+     * @param \Phinx\Seed\SeedInterface[] $seeds Seeds
+     * @return \Phinx\Seed\SeedInterface[]
      */
-    protected function orderSeedsByDependencies(array $seeds)
+    protected function orderSeedsByDependencies(array $seeds): array
     {
         $orderedSeeds = [];
         foreach ($seeds as $seed) {
@@ -872,18 +918,18 @@ class Manager
     /**
      * Gets an array of database seeders.
      *
+     * @param string $environment Environment
      * @throws \InvalidArgumentException
-     *
-     * @return \Phinx\Seed\AbstractSeed[]
+     * @return \Phinx\Seed\SeedInterface[]
      */
-    public function getSeeds()
+    public function getSeeds(string $environment): array
     {
         if ($this->seeds === null) {
             $phpFiles = $this->getSeedFiles();
 
             // filter the files to only get the ones that match our naming scheme
             $fileNames = [];
-            /** @var \Phinx\Seed\AbstractSeed[] $seeds */
+            /** @var \Phinx\Seed\SeedInterface[] $seeds */
             $seeds = [];
 
             foreach ($phpFiles as $filePath) {
@@ -913,6 +959,7 @@ class Manager
                     } else {
                         $seed = new $class();
                     }
+                    $seed->setEnvironment($environment);
                     $input = $this->getInput();
                     if ($input !== null) {
                         $seed->setInput($input);
@@ -948,7 +995,7 @@ class Manager
      *
      * @return string[]
      */
-    protected function getSeedFiles()
+    protected function getSeedFiles(): array
     {
         return Util::getFiles($this->getConfig()->getSeedPaths());
     }
@@ -957,7 +1004,6 @@ class Manager
      * Sets the config.
      *
      * @param \Phinx\Config\ConfigInterface $config Configuration Object
-     *
      * @return $this
      */
     public function setConfig(ConfigInterface $config)
@@ -972,7 +1018,7 @@ class Manager
      *
      * @return \Phinx\Config\ConfigInterface
      */
-    public function getConfig()
+    public function getConfig(): ConfigInterface
     {
         return $this->config;
     }
@@ -982,10 +1028,9 @@ class Manager
      *
      * @param string $environment Environment name
      * @param int|null $version Version
-     *
      * @return void
      */
-    public function toggleBreakpoint($environment, $version)
+    public function toggleBreakpoint(string $environment, ?int $version): void
     {
         $this->markBreakpoint($environment, $version, self::BREAKPOINT_TOGGLE);
     }
@@ -996,13 +1041,11 @@ class Manager
      * @param string $environment The required environment
      * @param int|null $version The version of the target migration
      * @param int $mark The state of the breakpoint as defined by self::BREAKPOINT_xxxx constants.
-     *
      * @return void
      */
-    protected function markBreakpoint($environment, $version, $mark)
+    protected function markBreakpoint(string $environment, ?int $version, int $mark): void
     {
         $migrations = $this->getMigrations($environment);
-        $this->getMigrations($environment);
         $env = $this->getEnvironment($environment);
         $versions = $env->getVersionLog();
 
@@ -1053,10 +1096,9 @@ class Manager
      * Remove all breakpoints
      *
      * @param string $environment The required environment
-     *
      * @return void
      */
-    public function removeBreakpoints($environment)
+    public function removeBreakpoints(string $environment): void
     {
         $this->getOutput()->writeln(sprintf(
             ' %d breakpoints cleared.',
@@ -1069,10 +1111,9 @@ class Manager
      *
      * @param string $environment The required environment
      * @param int|null $version The version of the target migration
-     *
      * @return void
      */
-    public function setBreakpoint($environment, $version)
+    public function setBreakpoint(string $environment, ?int $version): void
     {
         $this->markBreakpoint($environment, $version, self::BREAKPOINT_SET);
     }
@@ -1082,11 +1123,21 @@ class Manager
      *
      * @param string $environment The required environment
      * @param int|null $version The version of the target migration
-     *
      * @return void
      */
-    public function unsetBreakpoint($environment, $version)
+    public function unsetBreakpoint(string $environment, ?int $version): void
     {
         $this->markBreakpoint($environment, $version, self::BREAKPOINT_UNSET);
+    }
+
+    /**
+     * @param int $verbosityLevel Verbosity level for info messages
+     * @return $this
+     */
+    public function setVerbosityLevel(int $verbosityLevel)
+    {
+        $this->verbosityLevel = $verbosityLevel;
+
+        return $this;
     }
 }

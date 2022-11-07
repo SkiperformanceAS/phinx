@@ -4,16 +4,14 @@ namespace Test\Phinx\Console\Command;
 
 use InvalidArgumentException;
 use Phinx\Config\Config;
-use Phinx\Config\ConfigInterface;
+use Phinx\Console\Command\AbstractCommand;
 use Phinx\Console\Command\SeedCreate;
 use Phinx\Console\PhinxApplication;
-use Phinx\Migration\Manager;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Input\ArrayInput;
-use Symfony\Component\Console\Input\InputInterface;
-use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Output\StreamOutput;
 use Symfony\Component\Console\Tester\CommandTester;
+use Test\Phinx\TestUtils;
 
 class SeedCreateTest extends TestCase
 {
@@ -32,12 +30,14 @@ class SeedCreateTest extends TestCase
      */
     protected $output;
 
-    public function setUp(): void
+    protected function setUp(): void
     {
+        TestUtils::recursiveRmdir(sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'seeds');
+        mkdir(sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'seeds', 0777, true);
         $this->config = new Config([
             'paths' => [
                 'migrations' => sys_get_temp_dir(),
-                'seeds' => sys_get_temp_dir(),
+                'seeds' => sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'seeds',
             ],
             'environments' => [
                 'default_migration_table' => 'phinxlog',
@@ -71,7 +71,7 @@ class SeedCreateTest extends TestCase
 
         // mock the manager class
         /** @var Manager|\PHPUnit\Framework\MockObject\MockObject $managerStub */
-        $managerStub = $this->getMockBuilder('\Phinx\Migration\Manager')
+        $managerStub = $this->getMockBuilder(\Phinx\Migration\Manager::class)
             ->setConstructorArgs([$this->config, $this->input, $this->output])
             ->getMock();
 
@@ -79,12 +79,14 @@ class SeedCreateTest extends TestCase
         $command->setManager($managerStub);
 
         $commandTester = new CommandTester($command);
-        $commandTester->execute(['command' => $command->getName(), 'name' => 'MyDuplicateSeeder'], ['decorated' => false]);
+        $exitCode = $commandTester->execute(['command' => $command->getName(), 'name' => 'MyDuplicateSeeder'], ['decorated' => false]);
+        $this->assertSame(AbstractCommand::CODE_SUCCESS, $exitCode);
 
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('The file "MyDuplicateSeeder.php" already exists');
 
-        $commandTester->execute(['command' => $command->getName(), 'name' => 'MyDuplicateSeeder'], ['decorated' => false]);
+        $exitCode = $commandTester->execute(['command' => $command->getName(), 'name' => 'MyDuplicateSeeder'], ['decorated' => false]);
+        $this->assertSame(AbstractCommand::CODE_ERROR, $exitCode);
     }
 
     public function testExecuteWithInvalidClassName()
@@ -97,7 +99,7 @@ class SeedCreateTest extends TestCase
 
         // mock the manager class
         /** @var Manager|\PHPUnit\Framework\MockObject\MockObject $managerStub */
-        $managerStub = $this->getMockBuilder('\Phinx\Migration\Manager')
+        $managerStub = $this->getMockBuilder(\Phinx\Migration\Manager::class)
             ->setConstructorArgs([$this->config, $this->input, $this->output])
             ->getMock();
 
@@ -109,6 +111,68 @@ class SeedCreateTest extends TestCase
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('The seed class name "badseedname" is invalid. Please use CamelCase format');
 
-        $commandTester->execute(['command' => $command->getName(), 'name' => 'badseedname'], ['decorated' => false]);
+        $exitCode = $commandTester->execute(['command' => $command->getName(), 'name' => 'badseedname'], ['decorated' => false]);
+        $this->assertSame(AbstractCommand::CODE_ERROR, $exitCode);
+    }
+
+    public function testAlternativeTemplate()
+    {
+        $application = new PhinxApplication();
+        $application->add(new SeedCreate());
+
+        /** @var SeedCreate $command */
+        $command = $application->find('seed:create');
+
+        /** @var Manager $managerStub mock the manager class */
+        $managerStub = $this->getMockBuilder(\Phinx\Migration\Manager::class)
+            ->setConstructorArgs([$this->config, $this->input, $this->output])
+            ->getMock();
+
+        $command->setConfig($this->config);
+        $command->setManager($managerStub);
+
+        $commandTester = new CommandTester($command);
+
+        $commandLine = ['command' => $command->getName(), 'name' => 'AltTemplate', '--template' => __DIR__ . '/Templates/SimpleSeeder.template.php.dist'];
+        $exitCode = $commandTester->execute($commandLine, ['decorated' => false]);
+        $this->assertSame(AbstractCommand::CODE_SUCCESS, $exitCode);
+
+        // Get output.
+        preg_match('`created (?P<SeedFilename>.*?)\s`', $commandTester->getDisplay(), $match);
+
+        // Was migration created?
+        $this->assertFileExists($match['SeedFilename'], 'Failed to create seed file from template generator');
+
+        // Does the migration match our expectation?
+        $expectedMigration = "useClassName Phinx\\Seed\\AbstractSeed / className {$commandLine['name']} / baseClassName AbstractSeed\n";
+        $this->assertStringEqualsFile($match['SeedFilename'], $expectedMigration, 'Failed to create seed file from template generator correctly.');
+    }
+
+    public function testAlternativeTemplateDoesntExist()
+    {
+        $application = new PhinxApplication();
+        $application->add(new SeedCreate());
+
+        /** @var SeedCreate $command */
+        $command = $application->find('seed:create');
+
+        /** @var Manager $managerStub mock the manager class */
+        $managerStub = $this->getMockBuilder(\Phinx\Migration\Manager::class)
+            ->setConstructorArgs([$this->config, $this->input, $this->output])
+            ->getMock();
+
+        $command->setConfig($this->config);
+        $command->setManager($managerStub);
+
+        $commandTester = new CommandTester($command);
+
+        $template = __DIR__ . '/Templates/ThisDoesntExist.template.php.dist';
+        $commandLine = ['command' => $command->getName(), 'name' => 'AltTemplateDoesntExist', '--template' => $template];
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('The template file "' . $template . '" does not exist');
+
+        $exitCode = $commandTester->execute($commandLine, ['decorated' => false]);
+        $this->assertSame(AbstractCommand::CODE_ERROR, $exitCode);
     }
 }

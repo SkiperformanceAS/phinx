@@ -40,7 +40,8 @@ class AdapterFactory
     /**
      * Class map of database adapters, indexed by PDO::ATTR_DRIVER_NAME.
      *
-     * @var string[]
+     * @var array<string, \Phinx\Db\Adapter\AdapterInterface|string>
+     * @phpstan-var array<string, \Phinx\Db\Adapter\AdapterInterface|class-string<\Phinx\Db\Adapter\AdapterInterface>>
      */
     protected $adapters = [
         'mysql' => 'Phinx\Db\Adapter\MysqlAdapter',
@@ -52,7 +53,7 @@ class AdapterFactory
     /**
      * Class map of adapters wrappers, indexed by name.
      *
-     * @var string[]
+     * @var array<string, \Phinx\Db\Adapter\WrapperInterface|string>
      */
     protected $wrappers = [
         'prefix' => 'Phinx\Db\Adapter\TablePrefixAdapter',
@@ -61,21 +62,19 @@ class AdapterFactory
     ];
 
     /**
-     * Add or replace an adapter with a fully qualified class name.
+     * Register an adapter class with a given name.
      *
      * @param string $name Name
-     * @param string $class Class
-     *
+     * @param object|string $class Class
      * @throws \RuntimeException
-     *
      * @return $this
      */
-    public function registerAdapter($name, $class)
+    public function registerAdapter(string $name, $class)
     {
         if (!is_subclass_of($class, 'Phinx\Db\Adapter\AdapterInterface')) {
             throw new RuntimeException(sprintf(
                 'Adapter class "%s" must implement Phinx\\Db\\Adapter\\AdapterInterface',
-                $class
+                is_string($class) ? $class : get_class($class)
             ));
         }
         $this->adapters[$name] = $class;
@@ -87,12 +86,11 @@ class AdapterFactory
      * Get an adapter class by name.
      *
      * @param string $name Name
-     *
      * @throws \RuntimeException
-     *
-     * @return string
+     * @return object|string
+     * @phpstan-return object|class-string<\Phinx\Db\Adapter\AdapterInterface>
      */
-    protected function getClass($name)
+    protected function getClass(string $name)
     {
         if (empty($this->adapters[$name])) {
             throw new RuntimeException(sprintf(
@@ -108,11 +106,10 @@ class AdapterFactory
      * Get an adapter instance by name.
      *
      * @param string $name Name
-     * @param array $options Options
-     *
+     * @param array<string, mixed> $options Options
      * @return \Phinx\Db\Adapter\AdapterInterface
      */
-    public function getAdapter($name, array $options)
+    public function getAdapter(string $name, array $options): AdapterInterface
     {
         $class = $this->getClass($name);
 
@@ -123,18 +120,16 @@ class AdapterFactory
      * Add or replace a wrapper with a fully qualified class name.
      *
      * @param string $name Name
-     * @param string $class Class
-     *
+     * @param object|string $class Class
      * @throws \RuntimeException
-     *
      * @return $this
      */
-    public function registerWrapper($name, $class)
+    public function registerWrapper(string $name, $class)
     {
         if (!is_subclass_of($class, 'Phinx\Db\Adapter\WrapperInterface')) {
             throw new RuntimeException(sprintf(
                 'Wrapper class "%s" must be implement Phinx\\Db\\Adapter\\WrapperInterface',
-                $class
+                is_string($class) ? $class : get_class($class)
             ));
         }
         $this->wrappers[$name] = $class;
@@ -146,12 +141,10 @@ class AdapterFactory
      * Get a wrapper class by name.
      *
      * @param string $name Name
-     *
      * @throws \RuntimeException
-     *
-     * @return string
+     * @return \Phinx\Db\Adapter\WrapperInterface|string
      */
-    protected function getWrapperClass($name)
+    protected function getWrapperClass(string $name)
     {
         if (empty($this->wrappers[$name])) {
             throw new RuntimeException(sprintf(
@@ -168,10 +161,9 @@ class AdapterFactory
      *
      * @param string $name Name
      * @param \Phinx\Db\Adapter\AdapterInterface $adapter Adapter
-     *
-     * @return \Phinx\Db\Adapter\AdapterInterface
+     * @return \Phinx\Db\Adapter\AdapterWrapper
      */
-    public function getWrapper($name, AdapterInterface $adapter)
+    public function getWrapper(string $name, AdapterInterface $adapter): AdapterWrapper
     {
         $class = $this->getWrapperClass($name);
 

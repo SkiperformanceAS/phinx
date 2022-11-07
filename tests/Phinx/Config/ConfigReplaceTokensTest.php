@@ -6,6 +6,7 @@ use Phinx\Config\Config;
 
 /**
  * Class ConfigReplaceTokensTest
+ *
  * @package Test\Phinx\Config
  * @group config
  */
@@ -14,7 +15,7 @@ class ConfigReplaceTokensTest extends AbstractConfigTest
     /**
      * Data to be saved to $_SERVER and checked later
      *
-     * @var array
+     * @var array<string, mixed>
      */
     protected static $server = [
         'PHINX_TEST_VAR_1' => 'some-value',
@@ -25,7 +26,7 @@ class ConfigReplaceTokensTest extends AbstractConfigTest
     /**
      * Pass vars to $_SERVER
      */
-    public function setUp(): void
+    protected function setUp(): void
     {
         foreach (static::$server as $name => $value) {
             $_SERVER[$name] = $value;
@@ -35,7 +36,7 @@ class ConfigReplaceTokensTest extends AbstractConfigTest
     /**
      * Clean-up
      */
-    public function tearDown(): void
+    protected function tearDown(): void
     {
         foreach (static::$server as $name => $value) {
              unset($_SERVER[$name]);

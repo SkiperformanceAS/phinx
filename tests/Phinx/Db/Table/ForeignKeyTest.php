@@ -9,13 +9,12 @@ use RuntimeException;
 
 class ForeignKeyTest extends TestCase
 {
-
     /**
      * @var ForeignKey
      */
-    private $fk = null;
+    private $fk;
 
-    public function setUp(): void
+    protected function setUp(): void
     {
         $this->fk = new ForeignKey();
     }

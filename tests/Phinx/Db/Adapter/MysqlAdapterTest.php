@@ -3,7 +3,6 @@ declare(strict_types=1);
 
 namespace Test\Phinx\Db\Adapter;
 
-use Cake\Collection\Collection;
 use PDOException;
 use Phinx\Db\Adapter\AdapterInterface;
 use Phinx\Db\Adapter\MysqlAdapter;
@@ -22,7 +21,7 @@ class MysqlAdapterTest extends TestCase
      */
     private $adapter;
 
-    public function setUp(): void
+    protected function setUp(): void
     {
         if (!defined('MYSQL_DB_CONFIG')) {
             $this->markTestSkipped('Mysql tests disabled.');
@@ -38,7 +37,7 @@ class MysqlAdapterTest extends TestCase
         $this->adapter->disconnect();
     }
 
-    public function tearDown(): void
+    protected function tearDown(): void
     {
         unset($this->adapter);
     }
@@ -85,7 +84,7 @@ class MysqlAdapterTest extends TestCase
                 $e,
                 'Expected exception of type InvalidArgumentException, got ' . get_class($e)
             );
-            $this->assertRegExp('/There was a problem connecting to the database/', $e->getMessage());
+            $this->assertStringContainsString('There was a problem connecting to the database', $e->getMessage());
         }
     }
 
@@ -141,7 +140,7 @@ class MysqlAdapterTest extends TestCase
     {
         $sql = "CREATE TABLE `discouraged.naming.convention`
                 (id INT(11) NOT NULL)
-                ENGINE = InnoDB CHARACTER SET utf8 COLLATE utf8_general_ci";
+                ENGINE = InnoDB CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci";
         $this->adapter->execute($sql);
         $this->assertTrue($this->adapter->hasTable('discouraged.naming.convention'));
     }
@@ -187,7 +186,7 @@ class MysqlAdapterTest extends TestCase
 
         $table = new \Phinx\Db\Table('ntable', [], $this->adapter);
         $table->addColumn('realname', 'string')
-              ->addColumn('tag_id', 'integer')
+              ->addColumn('tag_id', 'integer', ['signed' => false])
               ->addForeignKey('tag_id', 'ntable_tag', 'id', ['delete' => 'NO_ACTION', 'update' => 'NO_ACTION'])
               ->save();
 
@@ -288,8 +287,8 @@ class MysqlAdapterTest extends TestCase
             'primary_key' => ['user_id', 'tag_id'],
         ];
         $table = new \Phinx\Db\Table('table1', $options, $this->adapter);
-        $table->addColumn('user_id', 'integer')
-              ->addColumn('tag_id', 'integer')
+        $table->addColumn('user_id', 'integer', ['null' => false])
+              ->addColumn('tag_id', 'integer', ['null' => false])
               ->save();
         $this->assertTrue($this->adapter->hasIndex('table1', ['user_id', 'tag_id']));
         $this->assertTrue($this->adapter->hasIndex('table1', ['USER_ID', 'tag_id']));
@@ -307,7 +306,7 @@ class MysqlAdapterTest extends TestCase
             'primary_key' => 'id',
         ];
         $table = new \Phinx\Db\Table('ztable', $options, $this->adapter);
-        $table->addColumn('id', 'uuid')->save();
+        $table->addColumn('id', 'uuid', ['null' => false])->save();
         $table->addColumn('user_id', 'integer')->save();
         $this->assertTrue($this->adapter->hasColumn('ztable', 'id'));
         $this->assertTrue($this->adapter->hasIndex('ztable', 'id'));
@@ -324,7 +323,7 @@ class MysqlAdapterTest extends TestCase
             'primary_key' => 'id',
         ];
         $table = new \Phinx\Db\Table('ztable', $options, $this->adapter);
-        $table->addColumn('id', 'binaryuuid')->save();
+        $table->addColumn('id', 'binaryuuid', ['null' => false])->save();
         $table->addColumn('user_id', 'integer')->save();
         $this->assertTrue($this->adapter->hasColumn('ztable', 'id'));
         $this->assertTrue($this->adapter->hasIndex('ztable', 'id'));
@@ -348,7 +347,7 @@ class MysqlAdapterTest extends TestCase
     public function testCreateTableWithUniqueIndexes()
     {
         $table = new \Phinx\Db\Table('table1', [], $this->adapter);
-        $table->addColumn('email', 'string')
+        $table->addColumn('email', 'string', ['limit' => 191])
               ->addIndex('email', ['unique' => true])
               ->save();
         $this->assertTrue($this->adapter->hasIndex('table1', ['email']));
@@ -394,8 +393,8 @@ class MysqlAdapterTest extends TestCase
     public function testCreateTableAndInheritDefaultCollation()
     {
         $options = MYSQL_DB_CONFIG + [
-            'charset' => 'utf8',
-            'collation' => 'utf8_unicode_ci',
+            'charset' => 'utf8mb4',
+            'collation' => 'utf8mb4_unicode_ci',
         ];
         $adapter = new MysqlAdapter($options, new ArrayInput([]), new NullOutput());
 
@@ -409,7 +408,7 @@ class MysqlAdapterTest extends TestCase
               ->save();
         $this->assertTrue($adapter->hasTable('table_with_default_collation'));
         $row = $adapter->fetchRow(sprintf("SHOW TABLE STATUS WHERE Name = '%s'", 'table_with_default_collation'));
-        $this->assertEquals('utf8_unicode_ci', $row['Collation']);
+        $this->assertEquals('utf8mb4_unicode_ci', $row['Collation']);
     }
 
     public function testCreateTableWithLatin1Collate()
@@ -460,6 +459,16 @@ class MysqlAdapterTest extends TestCase
         $this->assertFalse($this->adapter->hasColumn('ntable', 'address'));
     }
 
+    public function testCreateTableWithLimitPK()
+    {
+        $table = new \Phinx\Db\Table('ntable', ['id' => 'id', 'limit' => 4], $this->adapter);
+        $table->save();
+        $this->assertTrue($this->adapter->hasTable('ntable'));
+        $this->assertTrue($this->adapter->hasColumn('ntable', 'id'));
+        $column_definitions = $this->adapter->getColumns('ntable');
+        $this->assertSame($this->usingMysql8() ? null : 4, $column_definitions[0]->getLimit());
+    }
+
     public function testCreateTableWithSchema()
     {
         $table = new \Phinx\Db\Table(MYSQL_DB_CONFIG['name'] . '.ntable', [], $this->adapter);
@@ -487,7 +496,7 @@ class MysqlAdapterTest extends TestCase
     {
         $table = new \Phinx\Db\Table('table1', ['id' => false, 'primary_key' => 'column1'], $this->adapter);
         $table
-            ->addColumn('column1', 'integer')
+            ->addColumn('column1', 'integer', ['null' => false])
             ->addColumn('column2', 'integer')
             ->addColumn('column3', 'integer')
             ->save();
@@ -504,7 +513,7 @@ class MysqlAdapterTest extends TestCase
     {
         $table = new \Phinx\Db\Table('table1', ['id' => false, 'primary_key' => 'column1'], $this->adapter);
         $table
-            ->addColumn('column1', 'integer')
+            ->addColumn('column1', 'integer', ['null' => false])
             ->save();
 
         $table
@@ -613,7 +622,7 @@ class MysqlAdapterTest extends TestCase
         $table->addColumn('default_zero', 'string', ['default' => 'test'])
               ->save();
         $rows = $this->adapter->fetchAll('SHOW COLUMNS FROM table1');
-        $this->assertEquals("test", $rows[1]['Default']);
+        $this->assertEquals('test', $rows[1]['Default']);
     }
 
     public function testAddColumnWithDefaultZero()
@@ -624,7 +633,7 @@ class MysqlAdapterTest extends TestCase
               ->save();
         $rows = $this->adapter->fetchAll('SHOW COLUMNS FROM table1');
         $this->assertNotNull($rows[1]['Default']);
-        $this->assertEquals("0", $rows[1]['Default']);
+        $this->assertEquals('0', $rows[1]['Default']);
     }
 
     public function testAddColumnWithDefaultEmptyString()
@@ -662,15 +671,28 @@ class MysqlAdapterTest extends TestCase
         $this->assertTrue($rows[1]['Default'] === 'CURRENT_TIMESTAMP' || $rows[1]['Default'] === 'current_timestamp()');
     }
 
+    public function testAddColumnFirst()
+    {
+        $table = new \Phinx\Db\Table('table1', [], $this->adapter);
+        $table->save();
+        $table->addColumn('new_id', 'integer', ['after' => MysqlAdapter::FIRST])
+              ->save();
+        $rows = $this->adapter->fetchAll('SHOW COLUMNS FROM table1');
+        $this->assertSame('new_id', $rows[0]['Field']);
+    }
+
     public function integerDataProvider()
     {
         return [
             ['integer', [], 'int', '11', ''],
             ['integer', ['signed' => false], 'int', '11', ' unsigned'],
+            ['integer', ['limit' => 8], 'int', '8', ''],
             ['smallinteger', [], 'smallint', '6', ''],
             ['smallinteger', ['signed' => false], 'smallint', '6', ' unsigned'],
+            ['smallinteger', ['limit' => 3], 'smallint', '3', ''],
             ['biginteger', [], 'bigint', '20', ''],
             ['biginteger', ['signed' => false], 'bigint', '20', ' unsigned'],
+            ['biginteger', ['limit' => 12], 'bigint', '12', ''],
         ];
     }
 
@@ -742,14 +764,14 @@ class MysqlAdapterTest extends TestCase
 
     public function testAddStringColumnWithCustomCollation()
     {
-        $table = new \Phinx\Db\Table('table_custom_collation', ['collation' => 'utf8_general_ci'], $this->adapter);
+        $table = new \Phinx\Db\Table('table_custom_collation', ['collation' => 'utf8mb4_unicode_ci'], $this->adapter);
         $table->save();
         $this->assertFalse($table->hasColumn('string_collation_default'));
         $this->assertFalse($table->hasColumn('string_collation_custom'));
         $table->addColumn('string_collation_default', 'string', [])->save();
         $table->addColumn('string_collation_custom', 'string', ['collation' => 'utf8mb4_unicode_ci'])->save();
         $rows = $this->adapter->fetchAll('SHOW FULL COLUMNS FROM table_custom_collation');
-        $this->assertEquals('utf8_general_ci', $rows[1]['Collation']);
+        $this->assertEquals('utf8mb4_unicode_ci', $rows[1]['Collation']);
         $this->assertEquals('utf8mb4_unicode_ci', $rows[2]['Collation']);
     }
 
@@ -832,7 +854,7 @@ class MysqlAdapterTest extends TestCase
         $table->changeColumn('column1', $newColumn1)->save();
         $rows = $this->adapter->fetchAll('SHOW COLUMNS FROM t');
         $this->assertNotNull($rows[1]['Default']);
-        $this->assertEquals("test1", $rows[1]['Default']);
+        $this->assertEquals('test1', $rows[1]['Default']);
     }
 
     public function testChangeColumnDefaultToZero()
@@ -846,7 +868,7 @@ class MysqlAdapterTest extends TestCase
         $table->changeColumn('column1', $newColumn1)->save();
         $rows = $this->adapter->fetchAll('SHOW COLUMNS FROM t');
         $this->assertNotNull($rows[1]['Default']);
-        $this->assertEquals("0", $rows[1]['Default']);
+        $this->assertEquals('0', $rows[1]['Default']);
     }
 
     public function testChangeColumnDefaultToNull()
@@ -860,6 +882,47 @@ class MysqlAdapterTest extends TestCase
         $table->changeColumn('column1', $newColumn1)->save();
         $rows = $this->adapter->fetchAll('SHOW COLUMNS FROM t');
         $this->assertNull($rows[1]['Default']);
+    }
+
+    public function sqlTypeIntConversionProvider()
+    {
+        return [
+          // tinyint
+          [AdapterInterface::PHINX_TYPE_TINY_INTEGER, null, 'tinyint', 4],
+          [AdapterInterface::PHINX_TYPE_TINY_INTEGER, 2, 'tinyint', 2],
+          [AdapterInterface::PHINX_TYPE_TINY_INTEGER, MysqlAdapter::INT_TINY, 'tinyint', 4],
+          // smallint
+          [AdapterInterface::PHINX_TYPE_SMALL_INTEGER, null, 'smallint', 6],
+          [AdapterInterface::PHINX_TYPE_SMALL_INTEGER, 3, 'smallint', 3],
+          [AdapterInterface::PHINX_TYPE_SMALL_INTEGER, MysqlAdapter::INT_SMALL, 'smallint', 6],
+          // medium
+          [AdapterInterface::PHINX_TYPE_MEDIUM_INTEGER, null, 'mediumint', 8],
+          [AdapterInterface::PHINX_TYPE_MEDIUM_INTEGER, 2, 'mediumint', 2],
+          [AdapterInterface::PHINX_TYPE_MEDIUM_INTEGER, MysqlAdapter::INT_MEDIUM, 'mediumint', 8],
+          // integer
+          [AdapterInterface::PHINX_TYPE_INTEGER, null, 'int', 11],
+          [AdapterInterface::PHINX_TYPE_INTEGER, 4, 'int', 4],
+          [AdapterInterface::PHINX_TYPE_INTEGER, MysqlAdapter::INT_TINY, 'tinyint', 4],
+          [AdapterInterface::PHINX_TYPE_INTEGER, MysqlAdapter::INT_SMALL, 'smallint', 6],
+          [AdapterInterface::PHINX_TYPE_INTEGER, MysqlAdapter::INT_MEDIUM, 'mediumint', 8],
+          [AdapterInterface::PHINX_TYPE_INTEGER, MysqlAdapter::INT_REGULAR, 'int', 11],
+          [AdapterInterface::PHINX_TYPE_INTEGER, MysqlAdapter::INT_BIG, 'bigint', 20],
+          // bigint
+          [AdapterInterface::PHINX_TYPE_BIG_INTEGER, null, 'bigint', 20],
+          [AdapterInterface::PHINX_TYPE_BIG_INTEGER, 4, 'bigint', 4],
+          [AdapterInterface::PHINX_TYPE_BIG_INTEGER, MysqlAdapter::INT_BIG, 'bigint', 20],
+        ];
+    }
+
+    /**
+     * @dataProvider sqlTypeIntConversionProvider
+     * The second argument is not typed as MysqlAdapter::INT_BIG is a float, and all other values are integers
+     */
+    public function testGetSqlTypeIntegerConversion(string $type, $limit, string $expectedType, int $expectedLimit)
+    {
+        $sqlType = $this->adapter->getSqlType($type, $limit);
+        $this->assertSame($expectedType, $sqlType['name']);
+        $this->assertSame($expectedLimit, $sqlType['limit']);
     }
 
     public function testLongTextColumn()
@@ -1049,7 +1112,7 @@ class MysqlAdapterTest extends TestCase
         $table->addColumn('column1', 'datetime')->save();
         $columns = $table->getColumns();
         $sqlType = $this->adapter->getSqlType($columns[1]->getType(), $columns[1]->getLimit());
-        $this->assertEquals(null, $sqlType['limit']);
+        $this->assertNull($sqlType['limit']);
     }
 
     public function testDatetimeColumnLimit()
@@ -1146,14 +1209,13 @@ class MysqlAdapterTest extends TestCase
             ['column21', 'set', ['values' => ['one', 'two']]],
             ['column22', 'enum', ['values' => ['three', 'four']]],
             ['enum_quotes', 'enum', ['values' => [
-                "'", '\'\n', '\\', ',', '', "\\\n", "\\n", "\n", "\r", "\r\n", '/', ',,', "\t",
+                "'", '\'\n', '\\', ',', '', "\\\n", '\\n', "\n", "\r", "\r\n", '/', ',,', "\t",
             ]]],
             ['column23', 'bit', []],
         ];
     }
 
     /**
-     *
      * @dataProvider columnsProvider
      */
     public function testGetColumns($colName, $type, $options)
@@ -1230,6 +1292,29 @@ class MysqlAdapterTest extends TestCase
         $table->addIndex('email')
               ->save();
         $this->assertTrue($table->hasIndex('email'));
+    }
+
+    public function testAddIndexWithSort()
+    {
+        $this->adapter->connect();
+        if (!$this->usingMysql8()) {
+            $this->markTestSkipped('Cannot test index order on mysql versions less than 8');
+        }
+        $table = new \Phinx\Db\Table('table1', [], $this->adapter);
+        $table->addColumn('email', 'string')
+              ->addColumn('username', 'string')
+              ->save();
+        $this->assertFalse($table->hasIndexByName('table1_email_username'));
+        $table->addIndex(['email', 'username'], ['name' => 'table1_email_username', 'order' => ['email' => 'DESC', 'username' => 'ASC']])
+              ->save();
+        $this->assertTrue($table->hasIndexByName('table1_email_username'));
+        $rows = $this->adapter->fetchAll("SHOW INDEXES FROM table1 WHERE Key_name = 'table1_email_username' AND Column_name = 'email'");
+        $emailOrder = $rows[0]['Collation'];
+        $this->assertEquals($emailOrder, 'D');
+
+        $rows = $this->adapter->fetchAll("SHOW INDEXES FROM table1 WHERE Key_name = 'table1_email_username' AND Column_name = 'username'");
+        $emailOrder = $rows[0]['Collation'];
+        $this->assertEquals($emailOrder, 'A');
     }
 
     public function testAddMultipleFulltextIndex()
@@ -1412,21 +1497,21 @@ class MysqlAdapterTest extends TestCase
 
         $table = new \Phinx\Db\Table('table', [], $this->adapter);
         $table
-            ->addColumn('ref_table_id', 'integer')
+            ->addColumn('ref_table_id', 'integer', ['signed' => false])
             ->addForeignKey(['ref_table_id'], 'ref_table', ['id'])
             ->save();
 
         $this->assertTrue($this->adapter->hasForeignKey($table->getName(), ['ref_table_id']));
     }
 
-    public function testAddForeignKeyForTableWithUnsignedPK()
+    public function testAddForeignKeyForTableWithSignedPK()
     {
-        $refTable = new \Phinx\Db\Table('ref_table', ['signed' => false], $this->adapter);
+        $refTable = new \Phinx\Db\Table('ref_table', ['signed' => true], $this->adapter);
         $refTable->addColumn('field1', 'string')->save();
 
         $table = new \Phinx\Db\Table('table', [], $this->adapter);
         $table
-            ->addColumn('ref_table_id', 'integer', ['signed' => false])
+            ->addColumn('ref_table_id', 'integer')
             ->addForeignKey(['ref_table_id'], 'ref_table', ['id'])
             ->save();
 
@@ -1440,7 +1525,7 @@ class MysqlAdapterTest extends TestCase
 
         $table = new \Phinx\Db\Table('table', [], $this->adapter);
         $table
-            ->addColumn('ref_table_id', 'integer')
+            ->addColumn('ref_table_id', 'integer', ['signed' => false])
             ->addForeignKey(['ref_table_id'], 'ref_table', ['id'])
             ->save();
 
@@ -1448,14 +1533,14 @@ class MysqlAdapterTest extends TestCase
         $this->assertFalse($this->adapter->hasForeignKey($table->getName(), ['ref_table_id']));
     }
 
-    public function testDropForeignKeyForTableWithUnsignedPK()
+    public function testDropForeignKeyForTableWithSignedPK()
     {
-        $refTable = new \Phinx\Db\Table('ref_table', ['signed' => false], $this->adapter);
+        $refTable = new \Phinx\Db\Table('ref_table', ['signed' => true], $this->adapter);
         $refTable->addColumn('field1', 'string')->save();
 
         $table = new \Phinx\Db\Table('table', [], $this->adapter);
         $table
-            ->addColumn('ref_table_id', 'integer', ['signed' => false])
+            ->addColumn('ref_table_id', 'integer')
             ->addForeignKey(['ref_table_id'], 'ref_table', ['id'])
             ->save();
 
@@ -1470,7 +1555,7 @@ class MysqlAdapterTest extends TestCase
 
         $table = new \Phinx\Db\Table('table', [], $this->adapter);
         $table
-            ->addColumn('ref_table_id', 'integer')
+            ->addColumn('ref_table_id', 'integer', ['signed' => false])
             ->addForeignKey(['ref_table_id'], 'ref_table', ['id'])
             ->save();
 
@@ -1485,7 +1570,7 @@ class MysqlAdapterTest extends TestCase
 
         $table = new \Phinx\Db\Table('table', [], $this->adapter);
         $table
-            ->addColumn('ref_table_id', 'integer')
+            ->addColumn('ref_table_id', 'integer', ['signed' => false])
             ->addForeignKey(['ref_table_id'], 'ref_table', ['id'])
             ->save();
 
@@ -1500,7 +1585,7 @@ class MysqlAdapterTest extends TestCase
 
         $table = new \Phinx\Db\Table('table', [], $this->adapter);
         $table
-            ->addColumn('ref_table_id', 'integer')
+            ->addColumn('ref_table_id', 'integer', ['signed' => false])
             ->addForeignKeyWithName('my_constraint', ['ref_table_id'], 'ref_table', ['id'])
             ->save();
 
@@ -1508,14 +1593,14 @@ class MysqlAdapterTest extends TestCase
         $this->assertFalse($this->adapter->hasForeignKey($table->getName(), ['ref_table_id'], 'my_constraint2'));
     }
 
-    public function testHasForeignKeyWithConstraintForTableWithUnsignedPK()
+    public function testHasForeignKeyWithConstraintForTableWithSignedPK()
     {
-        $refTable = new \Phinx\Db\Table('ref_table', ['signed' => false], $this->adapter);
+        $refTable = new \Phinx\Db\Table('ref_table', ['signed' => true], $this->adapter);
         $refTable->addColumn('field1', 'string')->save();
 
         $table = new \Phinx\Db\Table('table', [], $this->adapter);
         $table
-            ->addColumn('ref_table_id', 'integer', ['signed' => false])
+            ->addColumn('ref_table_id', 'integer')
             ->addForeignKeyWithName('my_constraint', ['ref_table_id'], 'ref_table', ['id'])
             ->save();
 
@@ -1530,7 +1615,7 @@ class MysqlAdapterTest extends TestCase
 
         $table = new \Phinx\Db\Table('table', [], $this->adapter);
         $table
-            ->addColumn('ref_table_id', 'integer')
+            ->addColumn('ref_table_id', 'integer', ['signed' => false])
             ->addForeignKey(['ref_table_id'], 'ref_table', ['id'])
             ->save();
 
@@ -1727,13 +1812,13 @@ class MysqlAdapterTest extends TestCase
 
         $table = new \Phinx\Db\Table('table1', [], $this->adapter);
 
-        $table->addColumn('column1', 'string')
+        $table->addColumn('column1', 'string', ['null' => false])
             ->addColumn('column2', 'integer')
-            ->addColumn('column3', 'string', ['default' => 'test'])
+            ->addColumn('column3', 'string', ['default' => 'test', 'null' => false])
             ->save();
 
         $expectedOutput = <<<'OUTPUT'
-CREATE TABLE `table1` (`id` INT(11) NOT NULL AUTO_INCREMENT, `column1` VARCHAR(255) NOT NULL, `column2` INT(11) NOT NULL, `column3` VARCHAR(255) NOT NULL DEFAULT 'test', PRIMARY KEY (`id`)) ENGINE = InnoDB CHARACTER SET utf8 COLLATE utf8_general_ci;
+CREATE TABLE `table1` (`id` INT(11) unsigned NOT NULL AUTO_INCREMENT, `column1` VARCHAR(255) NOT NULL, `column2` INT(11) NULL, `column3` VARCHAR(255) NOT NULL DEFAULT 'test', PRIMARY KEY (`id`)) ENGINE = InnoDB CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 OUTPUT;
         $actualOutput = $consoleOutput->fetch();
         $this->assertStringContainsString($expectedOutput, $actualOutput, 'Passing the --dry-run option does not dump create table query to the output');
@@ -1783,7 +1868,7 @@ OUTPUT;
         $this->assertStringContainsString($expectedOutput, trim($actualOutput), 'Passing the --dry-run option doesn\'t dump the insert to the output');
 
         $countQuery = $this->adapter->query('SELECT COUNT(*) FROM table1');
-        self::assertTrue($countQuery->execute());
+        $this->assertTrue($countQuery->execute());
         $res = $countQuery->fetchAll();
         $this->assertEquals(0, $res[0]['COUNT(*)']);
     }
@@ -1824,7 +1909,7 @@ OUTPUT;
         $this->assertStringContainsString($expectedOutput, $actualOutput, 'Passing the --dry-run option doesn\'t dump the bulkinsert to the output');
 
         $countQuery = $this->adapter->query('SELECT COUNT(*) FROM table1');
-        self::assertTrue($countQuery->execute());
+        $this->assertTrue($countQuery->execute());
         $res = $countQuery->fetchAll();
         $this->assertEquals(0, $res[0]['COUNT(*)']);
     }
@@ -1839,7 +1924,7 @@ OUTPUT;
 
         $table = new \Phinx\Db\Table('table1', ['id' => false, 'primary_key' => ['column1']], $this->adapter);
 
-        $table->addColumn('column1', 'string')
+        $table->addColumn('column1', 'string', ['null' => false])
             ->addColumn('column2', 'integer')
             ->save();
 
@@ -1850,7 +1935,7 @@ OUTPUT;
         ])->save();
 
         $expectedOutput = <<<'OUTPUT'
-CREATE TABLE `table1` (`column1` VARCHAR(255) NOT NULL, `column2` INT(11) NOT NULL, PRIMARY KEY (`column1`)) ENGINE = InnoDB CHARACTER SET utf8 COLLATE utf8_general_ci;
+CREATE TABLE `table1` (`column1` VARCHAR(255) NOT NULL, `column2` INT(11) NULL, PRIMARY KEY (`column1`)) ENGINE = InnoDB CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 INSERT INTO `table1` (`column1`, `column2`) VALUES ('id1', 1);
 OUTPUT;
         $actualOutput = $consoleOutput->fetch();
@@ -1927,6 +2012,37 @@ OUTPUT;
         $this->assertEquals(1, $stm->rowCount());
     }
 
+    public function testQueryWithParams()
+    {
+        $table = new \Phinx\Db\Table('table1', [], $this->adapter);
+        $table->addColumn('string_col', 'string')
+            ->addColumn('int_col', 'integer')
+            ->save();
+
+        $this->adapter->insert($table->getTable(), [
+            'string_col' => 'test data',
+            'int_col' => 10,
+        ]);
+
+        $this->adapter->insert($table->getTable(), [
+            'string_col' => null,
+        ]);
+
+        $this->adapter->insert($table->getTable(), [
+            'int_col' => 23,
+        ]);
+
+        $countQuery = $this->adapter->query('SELECT COUNT(*) AS c FROM table1 WHERE int_col > ?', [5]);
+        $res = $countQuery->fetchAll();
+        $this->assertEquals(2, $res[0]['c']);
+
+        $this->adapter->execute('UPDATE table1 SET int_col = ? WHERE int_col IS NULL', [12]);
+
+        $countQuery->execute([1]);
+        $res = $countQuery->fetchAll();
+        $this->assertEquals(3, $res[0]['c']);
+    }
+
     public function testLiteralSupport()
     {
         $createQuery = <<<'INPUT'
@@ -1951,7 +2067,6 @@ INPUT;
 
     /**
      * @dataProvider geometryTypeProvider
-     *
      * @param string $type
      * @param string $geom
      */
@@ -1969,14 +2084,13 @@ INPUT;
 
         $this->adapter->execute("INSERT INTO table1 (`geom`) VALUES (ST_GeomFromText('{$geom}', 4326))");
         $rows = $this->adapter->fetchAll('SELECT ST_AsWKT(geom) as wkt, ST_SRID(geom) as srid FROM table1');
-        $this->assertSame(1, count($rows));
+        $this->assertCount(1, $rows);
         $this->assertSame($geom, $rows[0]['wkt']);
-        $this->assertSame('4326', $rows[0]['srid']);
+        $this->assertSame(4326, (int)$rows[0]['srid']);
     }
 
     /**
      * @dataProvider geometryTypeProvider
-     *
      * @param string $type
      * @param string $geom
      */
@@ -2005,15 +2119,142 @@ INPUT;
     public function testMysqlBlobsConstants()
     {
         $reflector = new \ReflectionClass(AdapterInterface::class);
-        $collection = new Collection($reflector->getConstants());
 
-        $validTypes = $collection->filter(function ($value, $constant) {
+        $validTypes = array_filter($reflector->getConstants(), function ($constant) {
             return substr($constant, 0, strlen('PHINX_TYPE_')) === 'PHINX_TYPE_';
-        })->toArray();
+        }, ARRAY_FILTER_USE_KEY);
 
         $this->assertTrue(in_array('tinyblob', $validTypes, true));
         $this->assertTrue(in_array('blob', $validTypes, true));
         $this->assertTrue(in_array('mediumblob', $validTypes, true));
         $this->assertTrue(in_array('longblob', $validTypes, true));
+    }
+
+    public function defaultsCastAsExpressions()
+    {
+        return [
+            [MysqlAdapter::PHINX_TYPE_BLOB, 'abc'],
+            [MysqlAdapter::PHINX_TYPE_JSON, '{"a": true}'],
+            [MysqlAdapter::PHINX_TYPE_TEXT, 'abc'],
+            [MysqlAdapter::PHINX_TYPE_GEOMETRY, 'POINT(0 0)'],
+            [MysqlAdapter::PHINX_TYPE_POINT, 'POINT(0 0)'],
+            [MysqlAdapter::PHINX_TYPE_LINESTRING, 'LINESTRING(30 10,10 30,40 40)'],
+            [MysqlAdapter::PHINX_TYPE_POLYGON, 'POLYGON((30 10,40 40,20 40,10 20,30 10))'],
+        ];
+    }
+
+    /**
+     * MySQL 8 added support for specifying defaults for the BLOB, TEXT, GEOMETRY, and JSON data types,
+     * however requiring that they be wrapped in expressions.
+     *
+     * @dataProvider defaultsCastAsExpressions
+     * @param string $type
+     * @param string $default
+     */
+    public function testDefaultsCastAsExpressionsForCertainTypes(string $type, string $default): void
+    {
+        $this->adapter->connect();
+
+        $table = new \Phinx\Db\Table('table1', ['id' => false], $this->adapter);
+        if (!$this->usingMysql8()) {
+            $this->expectException(PDOException::class);
+        }
+        $table
+            ->addColumn('col_1', $type, ['default' => $default])
+            ->create();
+
+        $columns = $this->adapter->getColumns('table1');
+        $this->assertCount(1, $columns);
+        $this->assertSame('col_1', $columns[0]->getName());
+        $this->assertSame($default, $columns[0]->getDefault());
+    }
+
+    public function testCreateTableWithPrecisionCurrentTimestamp()
+    {
+        $this->adapter->connect();
+        (new \Phinx\Db\Table('exampleCurrentTimestamp3', ['id' => false], $this->adapter))
+            ->addColumn('timestamp_3', 'timestamp', [
+                'null' => false,
+                'default' => 'CURRENT_TIMESTAMP(3)',
+                'limit' => 3,
+            ])
+            ->create();
+
+        $rows = $this->adapter->fetchAll(sprintf(
+            "SELECT COLUMN_DEFAULT FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA='%s' AND TABLE_NAME='exampleCurrentTimestamp3'",
+            MYSQL_DB_CONFIG['name']
+        ));
+        $colDef = $rows[0];
+        $this->assertEqualsIgnoringCase('CURRENT_TIMESTAMP(3)', $colDef['COLUMN_DEFAULT']);
+    }
+
+    public function pdoAttributeProvider()
+    {
+        return [
+            ['mysql_attr_invalid'],
+            ['attr_invalid'],
+        ];
+    }
+
+    /**
+     * @dataProvider pdoAttributeProvider
+     */
+    public function testInvalidPdoAttribute($attribute)
+    {
+        $adapter = new MysqlAdapter(MYSQL_DB_CONFIG + [$attribute => true]);
+        $this->expectException(\UnexpectedValueException::class);
+        $this->expectExceptionMessage('Invalid PDO attribute: ' . $attribute . ' (\PDO::' . strtoupper($attribute) . ')');
+        $adapter->connect();
+    }
+
+    public function integerDataTypesSQLProvider()
+    {
+        return [
+            // Types without a width should always have a null limit
+            ['bigint', ['name' => AdapterInterface::PHINX_TYPE_BIG_INTEGER, 'limit' => null, 'scale' => null]],
+            ['int', ['name' => AdapterInterface::PHINX_TYPE_INTEGER, 'limit' => null, 'scale' => null]],
+            ['mediumint', ['name' => AdapterInterface::PHINX_TYPE_MEDIUM_INTEGER, 'limit' => null, 'scale' => null]],
+            ['smallint', ['name' => AdapterInterface::PHINX_TYPE_SMALL_INTEGER, 'limit' => null, 'scale' => null]],
+            ['tinyint', ['name' => AdapterInterface::PHINX_TYPE_TINY_INTEGER, 'limit' => null, 'scale' => null]],
+
+            // Types which include a width should always have that as their limit
+            ['bigint(20)', ['name' => AdapterInterface::PHINX_TYPE_BIG_INTEGER, 'limit' => 20, 'scale' => null]],
+            ['bigint(10)', ['name' => AdapterInterface::PHINX_TYPE_BIG_INTEGER, 'limit' => 10, 'scale' => null]],
+            ['bigint(1) unsigned', ['name' => AdapterInterface::PHINX_TYPE_BIG_INTEGER, 'limit' => 1, 'scale' => null]],
+            ['int(11)', ['name' => AdapterInterface::PHINX_TYPE_INTEGER, 'limit' => 11, 'scale' => null]],
+            ['int(10) unsigned', ['name' => AdapterInterface::PHINX_TYPE_INTEGER, 'limit' => 10, 'scale' => null]],
+            ['mediumint(6)', ['name' => AdapterInterface::PHINX_TYPE_MEDIUM_INTEGER, 'limit' => 6, 'scale' => null]],
+            ['mediumint(8) unsigned', ['name' => AdapterInterface::PHINX_TYPE_MEDIUM_INTEGER, 'limit' => 8, 'scale' => null]],
+            ['smallint(2)', ['name' => AdapterInterface::PHINX_TYPE_SMALL_INTEGER, 'limit' => 2, 'scale' => null]],
+            ['smallint(5) unsigned', ['name' => AdapterInterface::PHINX_TYPE_SMALL_INTEGER, 'limit' => 5, 'scale' => null]],
+            ['tinyint(3) unsigned', ['name' => AdapterInterface::PHINX_TYPE_TINY_INTEGER, 'limit' => 3, 'scale' => null]],
+            ['tinyint(4)', ['name' => AdapterInterface::PHINX_TYPE_TINY_INTEGER, 'limit' => 4, 'scale' => null]],
+
+            // Special case for commonly used boolean type
+            ['tinyint(1)', ['name' => AdapterInterface::PHINX_TYPE_BOOLEAN, 'limit' => null, 'scale' => null]],
+        ];
+    }
+
+    /**
+     * @dataProvider integerDataTypesSQLProvider
+     */
+    public function testGetPhinxTypeFromSQLDefinition(string $sqlDefinition, array $expectedResponse)
+    {
+        $result = $this->adapter->getPhinxType($sqlDefinition);
+
+        $this->assertSame($expectedResponse['name'], $result['name'], "Type mismatch - got '{$result['name']}' when expecting '{$expectedResponse['name']}'");
+        $this->assertSame($expectedResponse['limit'], $result['limit'], "Field upper boundary mismatch - got '{$result['limit']}' when expecting '{$expectedResponse['limit']}'");
+    }
+
+    public function testPdoPersistentConnection()
+    {
+        $adapter = new MysqlAdapter(MYSQL_DB_CONFIG + ['attr_persistent' => true]);
+        $this->assertTrue($adapter->getConnection()->getAttribute(\PDO::ATTR_PERSISTENT));
+    }
+
+    public function testPdoNotPersistentConnection()
+    {
+        $adapter = new MysqlAdapter(MYSQL_DB_CONFIG);
+        $this->assertFalse($adapter->getConnection()->getAttribute(\PDO::ATTR_PERSISTENT));
     }
 }

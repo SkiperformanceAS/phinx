@@ -2,48 +2,24 @@
 
 namespace Test\Phinx\Db\Adapter;
 
+use PDO;
 use PDOException;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 
-class PdoAdapterTestPDOMock extends \PDO
-{
-    public function __construct()
-    {
-    }
-}
-
-/**
- * A mock PDO that stores its last exec()'d SQL that can be retrieved for queries.
- *
- * This exists as $this->getMockForAbstractClass('\PDO') fails under PHP5.4 and
- * an older PHPUnit; a PDO instance cannot be serialised.
- */
-class PdoAdapterTestPDOMockWithExecChecks extends PdoAdapterTestPDOMock
-{
-    private $sql;
-
-    public function exec($sql)
-    {
-        $this->sql = $sql;
-    }
-
-    public function getExecutedSqlForTest()
-    {
-        return $this->sql;
-    }
-}
-
 class PdoAdapterTest extends TestCase
 {
+    /**
+     * @var \Phinx\Db\Adapter\PdoAdapter|\PHPUnit\Framework\MockObject\MockObject
+     */
     private $adapter;
 
-    public function setUp(): void
+    protected function setUp(): void
     {
         $this->adapter = $this->getMockForAbstractClass('\Phinx\Db\Adapter\PdoAdapter', [['foo' => 'bar']]);
     }
 
-    public function tearDown(): void
+    protected function tearDown(): void
     {
         unset($this->adapter);
     }
@@ -57,9 +33,7 @@ class PdoAdapterTest extends TestCase
 
     public function testOptionsSetConnection()
     {
-        $this->assertNull($this->adapter->getConnection());
-
-        $connection = new PdoAdapterTestPDOMock();
+        $connection = $this->getMockBuilder(PDO::class)->disableOriginalConstructor()->getMock();
         $this->adapter->setOptions(['connection' => $connection]);
 
         $this->assertSame($connection, $this->adapter->getConnection());
@@ -68,6 +42,16 @@ class PdoAdapterTest extends TestCase
     public function testOptionsSetSchemaTableName()
     {
         $this->assertEquals('phinxlog', $this->adapter->getSchemaTableName());
+        $this->adapter->setOptions(['migration_table' => 'schema_table_test']);
+        $this->assertEquals('schema_table_test', $this->adapter->getSchemaTableName());
+    }
+
+    public function testOptionsSetDefaultMigrationTableThrowsDeprecation()
+    {
+        $this->assertEquals('phinxlog', $this->adapter->getSchemaTableName());
+
+        $this->expectDeprecation();
+        $this->expectExceptionMessage('The default_migration_table setting for adapter has been deprecated since 0.13.0. Use `migration_table` instead.');
         $this->adapter->setOptions(['default_migration_table' => 'schema_table_test']);
         $this->assertEquals('schema_table_test', $this->adapter->getSchemaTableName());
     }
@@ -196,23 +180,21 @@ class PdoAdapterTest extends TestCase
      */
     public function testExecuteCanBeCalled()
     {
-        $pdo = new PdoAdapterTestPDOMockWithExecChecks();
+        /** @var \PDO&\PHPUnit\Framework\MockObject\MockObject $pdo */
+        $pdo = $this->getMockBuilder(PDO::class)->disableOriginalConstructor()->onlyMethods(['exec'])->getMock();
+        $pdo->expects($this->once())->method('exec')->with('SELECT 1;')->will($this->returnValue(1));
 
         $this->adapter->setConnection($pdo);
-
         $this->adapter->execute('SELECT 1');
-
-        $this->assertSame('SELECT 1;', $pdo->getExecutedSqlForTest());
     }
 
     public function testExecuteRightTrimsSemiColons()
     {
-        $pdo = new PdoAdapterTestPDOMockWithExecChecks();
+        /** @var \PDO&\PHPUnit\Framework\MockObject\MockObject $pdo */
+        $pdo = $this->getMockBuilder(PDO::class)->disableOriginalConstructor()->onlyMethods(['exec'])->getMock();
+        $pdo->expects($this->once())->method('exec')->with('SELECT 1;')->will($this->returnValue(1));
 
         $this->adapter->setConnection($pdo);
-
         $this->adapter->execute('SELECT 1;;');
-
-        $this->assertSame('SELECT 1;', $pdo->getExecutedSqlForTest());
     }
 }

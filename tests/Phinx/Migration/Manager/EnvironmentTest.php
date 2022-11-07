@@ -2,46 +2,12 @@
 
 namespace Test\Phinx\Migration\Manager;
 
+use PDO;
 use Phinx\Db\Adapter\AdapterFactory;
 use Phinx\Migration\Manager\Environment;
 use Phinx\Migration\MigrationInterface;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
-
-class PDOMock extends \PDO
-{
-    /**
-     * @var array
-     */
-    protected $attributes = [];
-
-    public function __construct()
-    {
-    }
-
-    /**
-     * @param int $attribute Attribute
-     *
-     * @return string
-     */
-    public function getAttribute($attribute)
-    {
-        return isset($this->attributes[$attribute]) ? $this->attributes[$attribute] : 'pdomock';
-    }
-
-    /**
-     * @param int $attribute Attribute
-     * @param mixed $value Value
-     *
-     * @return bool
-     */
-    public function setAttribute($attribute, $value)
-    {
-        $this->attributes[$attribute] = $value;
-
-        return true;
-    }
-}
 
 class EnvironmentTest extends TestCase
 {
@@ -50,7 +16,7 @@ class EnvironmentTest extends TestCase
      */
     protected $environment;
 
-    public function setUp(): void
+    protected function setUp(): void
     {
         $this->environment = new Environment('test', []);
     }
@@ -91,21 +57,36 @@ class EnvironmentTest extends TestCase
         $this->environment->getAdapter();
     }
 
+    private function getPdoMock()
+    {
+        $pdoMock = $this->getMockBuilder(PDO::class)->disableOriginalConstructor()->getMock();
+        $attributes = [];
+        $pdoMock->method('setAttribute')->will($this->returnCallback(function ($attribute, $value) use (&$attributes) {
+            $attributes[$attribute] = $value;
+
+            return true;
+        }));
+        $pdoMock->method('getAttribute')->will($this->returnCallback(function ($attribute) use (&$attributes) {
+            return $attributes[$attribute] ?? 'pdomock';
+        }));
+
+        return $pdoMock;
+    }
+
     public function testGetAdapterWithExistingPdoInstance()
     {
         $adapter = $this->getMockForAbstractClass('\Phinx\Db\Adapter\PdoAdapter', [['foo' => 'bar']]);
         AdapterFactory::instance()->registerAdapter('pdomock', $adapter);
-        $this->environment->setOptions(['connection' => new PDOMock()]);
+        $this->environment->setOptions(['connection' => $this->getPdoMock()]);
         $options = $this->environment->getAdapter()->getOptions();
         $this->assertEquals('pdomock', $options['adapter']);
     }
 
     public function testSetPdoAttributeToErrmodeException()
     {
-        $pdoMock = new PDOMock();
         $adapter = $this->getMockForAbstractClass('\Phinx\Db\Adapter\PdoAdapter', [['foo' => 'bar']]);
         AdapterFactory::instance()->registerAdapter('pdomock', $adapter);
-        $this->environment->setOptions(['connection' => $pdoMock]);
+        $this->environment->setOptions(['connection' => $this->getPdoMock()]);
         $options = $this->environment->getAdapter()->getOptions();
         $this->assertEquals(\PDO::ERRMODE_EXCEPTION, $options['connection']->getAttribute(\PDO::ATTR_ERRMODE));
     }
@@ -159,7 +140,7 @@ class EnvironmentTest extends TestCase
             ->getMock();
         $adapterStub->expects($this->once())
                     ->method('migrated')
-                    ->will($this->returnArgument(0));
+                    ->willReturn($adapterStub);
 
         $this->environment->setAdapter($adapterStub);
 
@@ -182,7 +163,7 @@ class EnvironmentTest extends TestCase
             ->getMock();
         $adapterStub->expects($this->once())
                     ->method('migrated')
-                    ->will($this->returnArgument(0));
+                    ->willReturn($adapterStub);
 
         $this->environment->setAdapter($adapterStub);
 
@@ -234,7 +215,7 @@ class EnvironmentTest extends TestCase
             ->getMock();
         $adapterStub->expects($this->once())
                     ->method('migrated')
-                    ->will($this->returnArgument(0));
+                    ->willReturn($adapterStub);
 
         $this->environment->setAdapter($adapterStub);
 
@@ -257,7 +238,7 @@ class EnvironmentTest extends TestCase
             ->getMock();
         $adapterStub->expects($this->once())
                     ->method('migrated')
-                    ->will($this->returnArgument(0));
+                    ->willReturn($adapterStub);
 
         $this->environment->setAdapter($adapterStub);
 
@@ -289,7 +270,7 @@ class EnvironmentTest extends TestCase
             ->getMock();
         $adapterStub->expects($this->once())
                     ->method('migrated')
-                    ->will($this->returnArgument(0));
+                    ->willReturn($adapterStub);
 
         $this->environment->setAdapter($adapterStub);
 

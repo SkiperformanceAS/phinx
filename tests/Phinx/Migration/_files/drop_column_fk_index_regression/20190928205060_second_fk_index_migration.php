@@ -11,12 +11,12 @@ class SecondFkIndexMigration extends AbstractMigration
             'primary_key' => ['id'],
             'engine' => 'InnoDB',
             'encoding' => 'utf8',
-            'collation' => 'utf8_unicode_ci',
+            'collation' => 'utf8mb4_unicode_ci',
             'comment' => '',
             'row_format' => 'DYNAMIC',
         ])
         ->removeColumn('table3_id')
-        ->removeIndexByName("table1_table3_id")
+        ->removeIndexByName('table1_table3_id')
         ->dropForeignKey('table3_id', 'table1_table3_id')
         ->update();
     }

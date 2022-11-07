@@ -8,6 +8,7 @@ use UnexpectedValueException;
 
 /**
  * Class ConfigTest
+ *
  * @package Test\Phinx\Config
  * @group config
  */
@@ -97,9 +98,51 @@ class ConfigTest extends AbstractConfigTest
     public function testGetDefaultEnvironmentUsingDatabaseKey()
     {
         $configArray = $this->getConfigArray();
-        $configArray['environments']['default_database'] = 'production';
+        $configArray['environments']['default_environment'] = 'production';
         $config = new Config($configArray);
         $this->assertEquals('production', $config->getDefaultEnvironment());
+    }
+
+    /**
+     * @covers \Phinx\Config\Config::getDefaultEnvironment
+     */
+    public function testGetDefaultEnvironmentUsingDefaultDatabase()
+    {
+        $configArray = $this->getConfigArray();
+        $configArray['environments']['default_database'] = 'production';
+        $config = new Config($configArray);
+
+        $errorReporting = error_reporting();
+        try {
+            error_reporting(E_ALL ^ E_USER_DEPRECATED);
+            $this->assertEquals('production', $config->getDefaultEnvironment());
+        } finally {
+            error_reporting($errorReporting);
+        }
+    }
+
+    /**
+     * @covers \Phinx\Config\Config::getDefaultEnvironment
+     */
+    public function testDefaultDatabaseThrowsDeprecatedNotice()
+    {
+        $configArray = $this->getConfigArray();
+        $configArray['environments']['default_database'] = 'production';
+        $config = new Config($configArray);
+
+        $this->expectDeprecation();
+        $this->expectExceptionMessage('default_database in the config has been deprecated since 0.12, use default_environment instead.');
+        $config->getDefaultEnvironment();
+    }
+
+    public function testEnvironmentHasMigrationTable()
+    {
+        $configArray = $this->getConfigArray();
+        $configArray['environments']['production']['migration_table'] = 'test_table';
+        $config = new Config($configArray);
+
+        $this->assertSame('phinxlog', $config->getEnvironment('testing')['migration_table']);
+        $this->assertSame('test_table', $config->getEnvironment('production')['migration_table']);
     }
 
     /**
@@ -363,13 +406,37 @@ class ConfigTest extends AbstractConfigTest
             'environments' => [
                 'production' => [
                     'adapter' => 'sqlite',
-                    'memory' => "yes",
+                    'memory' => 'yes',
                 ],
             ],
         ]);
         $this->assertSame(
-            ['adapter' => 'sqlite', 'memory' => "yes", 'name' => ':memory:'],
+            ['adapter' => 'sqlite', 'memory' => 'yes', 'name' => ':memory:'],
             $config->getEnvironment('production')
         );
+    }
+
+    public function testDefaultTemplateStyle(): void
+    {
+        $config = new \Phinx\Config\Config([]);
+        $this->assertSame('change', $config->getTemplateStyle());
+    }
+
+    public function templateStyleDataProvider(): array
+    {
+        return [
+            ['change', 'change'],
+            ['up_down', 'up_down'],
+            ['foo', 'change'],
+        ];
+    }
+
+    /**
+     * @dataProvider templateStyleDataProvider
+     */
+    public function testTemplateStyle(string $style, string $expected): void
+    {
+        $config = new \Phinx\Config\Config(['templates' => ['style' => $style]]);
+        $this->assertSame($expected, $config->getTemplateStyle());
     }
 }

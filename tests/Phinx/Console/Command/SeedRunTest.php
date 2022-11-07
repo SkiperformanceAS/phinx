@@ -3,15 +3,11 @@
 namespace Test\Phinx\Console\Command;
 
 use Phinx\Config\Config;
-use Phinx\Config\ConfigInterface;
 use Phinx\Console\Command\AbstractCommand;
 use Phinx\Console\Command\SeedRun;
 use Phinx\Console\PhinxApplication;
-use Phinx\Migration\Manager;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Input\ArrayInput;
-use Symfony\Component\Console\Input\InputInterface;
-use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Output\StreamOutput;
 use Symfony\Component\Console\Tester\CommandTester;
 
@@ -32,7 +28,7 @@ class SeedRunTest extends TestCase
      */
     protected $output;
 
-    public function setUp(): void
+    protected function setUp(): void
     {
         $this->config = new Config([
             'paths' => [
@@ -77,9 +73,9 @@ class SeedRunTest extends TestCase
         $command->setManager($managerStub);
 
         $commandTester = new CommandTester($command);
-        $commandTester->execute(['command' => $command->getName()], ['decorated' => false]);
-
-        $this->assertRegExp('/no environment specified/', $commandTester->getDisplay());
+        $exitCode = $commandTester->execute(['command' => $command->getName()], ['decorated' => false]);
+        $this->assertSame(AbstractCommand::CODE_SUCCESS, $exitCode);
+        $this->assertStringContainsString('no environment specified', $commandTester->getDisplay());
     }
 
     public function testExecuteWithDsn()
@@ -97,7 +93,7 @@ class SeedRunTest extends TestCase
             ],
             'environments' => [
                 'default_migration_table' => 'phinxlog',
-                'default_database' => 'development',
+                'default_environment' => 'development',
                 'development' => [
                     'dsn' => 'mysql://fakehost:3006/development',
                 ],
@@ -116,9 +112,9 @@ class SeedRunTest extends TestCase
         $command->setManager($managerStub);
 
         $commandTester = new CommandTester($command);
-        $commandTester->execute(['command' => $command->getName()], ['decorated' => false]);
-
-        $this->assertRegExp('/no environment specified/', $commandTester->getDisplay());
+        $exitCode = $commandTester->execute(['command' => $command->getName()], ['decorated' => false]);
+        $this->assertSame(AbstractCommand::CODE_SUCCESS, $exitCode);
+        $this->assertStringContainsString('no environment specified', $commandTester->getDisplay());
     }
 
     public function testExecuteWithEnvironmentOption()
@@ -143,7 +139,7 @@ class SeedRunTest extends TestCase
 
         $commandTester = new CommandTester($command);
         $exitCode = $commandTester->execute(['command' => $command->getName(), '--environment' => 'development'], ['decorated' => false]);
-        $this->assertRegExp('/using environment development/', $commandTester->getDisplay());
+        $this->assertStringContainsString('using environment development', $commandTester->getDisplay());
         $this->assertSame(AbstractCommand::CODE_SUCCESS, $exitCode);
     }
 
@@ -169,8 +165,8 @@ class SeedRunTest extends TestCase
         $commandTester = new CommandTester($command);
         $exitCode = $commandTester->execute(['command' => $command->getName(), '--environment' => 'fakeenv'], ['decorated' => false]);
 
-        $this->assertRegExp('/using environment fakeenv/', $commandTester->getDisplay());
-        $this->assertStringEndsWith("The environment \"fakeenv\" does not exist", trim($commandTester->getDisplay()));
+        $this->assertStringContainsString('using environment fakeenv', $commandTester->getDisplay());
+        $this->assertStringEndsWith('The environment "fakeenv" does not exist', trim($commandTester->getDisplay()));
         $this->assertSame(AbstractCommand::CODE_ERROR, $exitCode);
     }
 
@@ -194,8 +190,9 @@ class SeedRunTest extends TestCase
         $command->setManager($managerStub);
 
         $commandTester = new CommandTester($command);
-        $commandTester->execute(['command' => $command->getName()], ['decorated' => false]);
-        $this->assertRegExp('/using database development/', $commandTester->getDisplay());
+        $exitCode = $commandTester->execute(['command' => $command->getName()], ['decorated' => false]);
+        $this->assertSame(AbstractCommand::CODE_SUCCESS, $exitCode);
+        $this->assertStringContainsString('using database development', $commandTester->getDisplay());
     }
 
     public function testExecuteMultipleSeeders()
@@ -222,15 +219,16 @@ class SeedRunTest extends TestCase
         $command->setManager($managerStub);
 
         $commandTester = new CommandTester($command);
-        $commandTester->execute(
+        $exitCode = $commandTester->execute(
             [
                 'command' => $command->getName(),
                 '--seed' => ['One', 'Two', 'Three'],
             ],
             ['decorated' => false]
         );
+        $this->assertSame(AbstractCommand::CODE_SUCCESS, $exitCode);
 
-        $this->assertRegExp('/no environment specified/', $commandTester->getDisplay());
+        $this->assertStringContainsString('no environment specified', $commandTester->getDisplay());
     }
 
     public function testSeedRunMemorySqlite()
@@ -278,9 +276,9 @@ class SeedRunTest extends TestCase
         );
 
         $this->assertStringContainsString(implode(PHP_EOL, [
-            "using environment development",
-            "using adapter sqlite",
-            "using database :memory:",
+            'using environment development',
+            'using adapter sqlite',
+            'using database :memory:',
         ]) . PHP_EOL, $commandTester->getDisplay());
         $this->assertSame(AbstractCommand::CODE_SUCCESS, $exitCode);
     }

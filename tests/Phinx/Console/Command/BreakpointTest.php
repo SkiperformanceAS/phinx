@@ -4,15 +4,11 @@ namespace Test\Phinx\Console\Command;
 
 use InvalidArgumentException;
 use Phinx\Config\Config;
-use Phinx\Config\ConfigInterface;
 use Phinx\Console\Command\AbstractCommand;
 use Phinx\Console\Command\Breakpoint;
 use Phinx\Console\PhinxApplication;
-use Phinx\Migration\Manager;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Input\ArrayInput;
-use Symfony\Component\Console\Input\InputInterface;
-use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Output\StreamOutput;
 use Symfony\Component\Console\Tester\CommandTester;
 
@@ -41,7 +37,7 @@ class BreakpointTest extends TestCase
     /**
      * @return void
      */
-    public function setUp(): void
+    protected function setUp(): void
     {
         @mkdir(sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'migrations', 0777, true);
         $this->config = new Config(
@@ -79,7 +75,6 @@ class BreakpointTest extends TestCase
      * @param array $commandLine
      * @param int|null $version
      * @param bool $noVersionParameter
-     *
      * @dataProvider provideBreakpointTests
      */
     public function testExecute($testMethod, $commandLine, $version = null, $noVersionParameter = false)
@@ -111,7 +106,8 @@ class BreakpointTest extends TestCase
         $commandTester = new CommandTester($command);
 
         $commandLine = array_merge(['command' => $command->getName()], $commandLine);
-        $commandTester->execute($commandLine, ['decorated' => false]);
+        $exitCode = $commandTester->execute($commandLine, ['decorated' => false]);
+        $this->assertSame(AbstractCommand::CODE_SUCCESS, $exitCode);
     }
 
     public function provideBreakpointTests()
@@ -182,7 +178,7 @@ class BreakpointTest extends TestCase
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('Cannot toggle a breakpoint and remove all breakpoints at the same time.');
 
-        $commandTester->execute(
+        $exitCode = $commandTester->execute(
             [
                 'command' => $command->getName(),
                 '--remove-all' => true,
@@ -190,11 +186,11 @@ class BreakpointTest extends TestCase
             ],
             ['decorated' => false]
         );
+        $this->assertSame(AbstractCommand::CODE_ERROR, $exitCode);
     }
 
     /**
      * @param array $commandLine
-     *
      * @dataProvider provideCombinedParametersToCauseException
      */
     public function testRemoveAllSetUnsetCombinedThrowsException($commandLine)
@@ -221,7 +217,8 @@ class BreakpointTest extends TestCase
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('Cannot use more than one of --set, --unset, or --remove-all at the same time.');
 
-        $commandTester->execute($commandLine, ['decorated' => false]);
+        $exitCode = $commandTester->execute($commandLine, ['decorated' => false]);
+        $this->assertSame(AbstractCommand::CODE_ERROR, $exitCode);
     }
 
     public function provideCombinedParametersToCauseException()
@@ -299,8 +296,8 @@ class BreakpointTest extends TestCase
         $commandTester = new CommandTester($command);
         $exitCode = $commandTester->execute(['command' => $command->getName(), '--environment' => 'fakeenv'], ['decorated' => false]);
 
-        $this->assertRegExp('/using environment fakeenv/', $commandTester->getDisplay());
-        $this->assertStringEndsWith("The environment \"fakeenv\" does not exist", trim($commandTester->getDisplay()));
+        $this->assertStringContainsString('using environment fakeenv', $commandTester->getDisplay());
+        $this->assertStringEndsWith('The environment "fakeenv" does not exist', trim($commandTester->getDisplay()));
         $this->assertSame(AbstractCommand::CODE_ERROR, $exitCode);
     }
 }

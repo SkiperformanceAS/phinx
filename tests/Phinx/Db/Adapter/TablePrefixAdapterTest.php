@@ -32,7 +32,7 @@ class TablePrefixAdapterTest extends TestCase
      */
     private $mock;
 
-    public function setUp(): void
+    protected function setUp(): void
     {
         $options = [
             'table_prefix' => 'pre_',
@@ -69,7 +69,7 @@ class TablePrefixAdapterTest extends TestCase
         $this->adapter = new TablePrefixAdapter($this->mock);
     }
 
-    public function tearDown(): void
+    protected function tearDown(): void
     {
         unset($this->adapter);
         unset($this->mock);
@@ -393,7 +393,7 @@ class TablePrefixAdapterTest extends TestCase
             [new DropTable($table)],
             [RemoveColumn::build($table, 'acolumn')],
             [RenameColumn::build($table, 'acolumn', 'another')],
-            [new RenameTable($table, 'new_name')],
+            [new RenameTable($table, 'new_name'), true],
             [new ChangePrimaryKey($table, 'column1')],
             [new ChangeComment($table, 'comment1')],
         ];
@@ -412,10 +412,17 @@ class TablePrefixAdapterTest extends TestCase
                 $this->assertEquals('pre_my_test_suf', $newActions[0]->getTable()->getName());
 
                 if ($checkReferecedTable) {
-                    $this->assertEquals(
-                        'pre_another_table_suf',
-                        $newActions[0]->getForeignKey()->getReferencedTable()->getName()
-                    );
+                    if ($action instanceof AddForeignKey) {
+                        $this->assertEquals(
+                            'pre_another_table_suf',
+                            $newActions[0]->getForeignKey()->getReferencedTable()->getName()
+                        );
+                    } elseif ($action instanceof RenameTable) {
+                        $this->assertEquals(
+                            'pre_new_name_suf',
+                            $newActions[0]->getNewName()
+                        );
+                    }
                 }
             }));
 

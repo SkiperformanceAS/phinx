@@ -7,13 +7,16 @@
 
 namespace Phinx\Console\Command;
 
+use Phinx\Util\Util;
+use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 
+#[AsCommand(name: 'list:aliases')]
 class ListAliases extends AbstractCommand
 {
     /**
-     * @var string
+     * @var string|null
      */
     protected static $defaultName = 'list:aliases';
 
@@ -22,7 +25,7 @@ class ListAliases extends AbstractCommand
      *
      * @return void
      */
-    protected function configure()
+    protected function configure(): void
     {
         parent::configure();
 
@@ -35,10 +38,9 @@ class ListAliases extends AbstractCommand
      *
      * @param \Symfony\Component\Console\Input\InputInterface $input Input
      * @param \Symfony\Component\Console\Output\OutputInterface $output Output
-     *
      * @return int 0 on success
      */
-    protected function execute(InputInterface $input, OutputInterface $output)
+    protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $this->bootstrap($input, $output);
 
@@ -61,13 +63,14 @@ class ListAliases extends AbstractCommand
                         array_keys($aliases),
                         $aliases
                     )
-                )
+                ),
+                $this->verbosityLevel
             );
         } else {
             $output->writeln(
                 sprintf(
                     '<error>No aliases defined in %s</error>',
-                    str_replace(getcwd(), '', realpath($this->config->getConfigFilePath()))
+                    Util::relativePath($this->config->getConfigFilePath())
                 )
             );
         }
