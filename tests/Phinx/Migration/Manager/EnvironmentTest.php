@@ -11,6 +11,7 @@ use Phinx\Migration\MigrationInterface;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 use stdClass;
+use Phinx\Migration\AbstractMigration;
 
 class EnvironmentTest extends TestCase
 {

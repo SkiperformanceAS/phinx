@@ -142,32 +142,33 @@ EOT
      */
     public function getTargetFromDate(string $date): string
     {
-        if (!preg_match('/^\d{4,14}$/', $date)) {
-            throw new InvalidArgumentException('Invalid date. Format is YYYY[MM[DD[HH[II[SS]]]]].');
+        if (!preg_match('/^\d{4,20}$/', $date)) {
+            throw new InvalidArgumentException('Invalid date. Format is YYYY[MM[DD[HH[II[SS[u]]]]]].');
         }
 
         // what we need to append to the date according to the possible date string lengths
         $dateStrlenToAppend = [
-            14 => '',
-            12 => '00',
-            10 => '0000',
-            8 => '000000',
-            6 => '01000000',
-            4 => '0101000000',
+            20 => '',
+            14 => '000000',
+            12 => '00000000',
+            10 => '0000000000',
+            8 => '000000000000',
+            6 => '01000000000000',
+            4 => '0101000000000000',
         ];
 
         if (!isset($dateStrlenToAppend[strlen($date)])) {
-            throw new InvalidArgumentException('Invalid date. Format is YYYY[MM[DD[HH[II[SS]]]]].');
+            throw new InvalidArgumentException('Invalid date. Format is YYYY[MM[DD[HH[II[SS[u]]]]]].');
         }
 
         $target = $date . $dateStrlenToAppend[strlen($date)];
 
-        $dateTime = DateTime::createFromFormat('YmdHis', $target);
+        $dateTime = DateTime::createFromFormat('YmdHisu', $target);
 
         if ($dateTime === false) {
-            throw new InvalidArgumentException('Invalid date. Format is YYYY[MM[DD[HH[II[SS]]]]].');
+            throw new InvalidArgumentException('Invalid date. Format is YYYY[MM[DD[HH[II[SS[u]]]]]].');
         }
 
-        return $dateTime->format('YmdHis');
+        return $dateTime->format('YmdHisu');
     }
 }

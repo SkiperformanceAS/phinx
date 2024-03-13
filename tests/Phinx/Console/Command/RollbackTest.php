@@ -207,7 +207,7 @@ class RollbackTest extends TestCase
         $application = new PhinxApplication('testing');
 
         $date = '20160101';
-        $target = '20160101000000';
+        $target = '20160101000000000000';
 
         $application->add(new Rollback());
 
@@ -243,23 +243,23 @@ class RollbackTest extends TestCase
     {
         return [
             'Date with only year' => [
-                '2015', '20150101000000',
+                '2015', '20150101000000000000',
             ],
             'Date with year and month' => [
-                '201409', '20140901000000',
+                '201409', '20140901000000000000',
             ],
             'Date with year, month and day' => [
-                '20130517', '20130517000000',
+                '20130517', '20130517000000000000',
             ],
             'Date with year, month, day and hour' => [
-                '2013051406', '20130514060000',
+                '2013051406', '20130514060000000000',
             ],
             'Date with year, month, day, hour and minutes' => [
-                '201305140647', '20130514064700',
+                '201305140647', '20130514064700000000',
             ],
             'Date with year, month, day, hour, minutes and seconds' => [
-                '20130514064726', '20130514064726',
-            ],
+                '20130514064726', '20130514064726000000',
+            ]
         ];
     }
 
@@ -271,7 +271,7 @@ class RollbackTest extends TestCase
         $rollbackCommand = new Rollback();
 
         $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('Invalid date. Format is YYYY[MM[DD[HH[II[SS]]]]].');
+        $this->expectExceptionMessage('Invalid date. Format is YYYY[MM[DD[HH[II[SS[u]]]]]].');
 
         $rollbackCommand->getTargetFromDate($invalidDate);
     }
@@ -302,7 +302,7 @@ class RollbackTest extends TestCase
             ->getMock();
         $managerStub->expects($this->once())
                     ->method('rollback')
-                    ->with(self::DEFAULT_TEST_ENVIRONMENT, '20150101000000', false, false);
+                    ->with(self::DEFAULT_TEST_ENVIRONMENT, '20150101000000000000', false, false);
 
         $command->setConfig($this->config);
         $command->setManager($managerStub);
